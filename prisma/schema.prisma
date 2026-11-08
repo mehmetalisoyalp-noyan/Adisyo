@@ -1,0 +1,443 @@
+// Restoran Yönetim Sistemi — veri modeli
+// Çok kiracılı (multi-tenant): her kayıt bir Organization'a (işletme grubu) bağlıdır.
+// Böylece ileride başka işletmelere abonelik satılabilir; veri ayrımı organizationId ile sağlanır.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------- Kiracı & kullanıcılar
+
+model Organization {
+  id         String   @id @default(cuid())
+  name       String
+  taxNumber  String?
+  taxOffice  String?
+  plan       Plan     @default(STANDARD)
+  createdAt  DateTime @default(now())
+
+  branches      Branch[]
+  users         User[]
+  categories    Category[]
+  products      Product[]
+  stockItems    StockItem[]
+  accounts      Account[]
+  ledgerEntries LedgerEntry[]
+  purchases     PurchaseInvoice[]
+  orders        Order[]
+  movements     StockMovement[]
+  eDocuments    EDocument[]
+}
+
+enum Plan {
+  STANDARD
+  PRO
+}
+
+model Branch {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  address        String?
+  hasDelivery    Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+
+  users       User[]
+  tables      DiningTable[]
+  stockLevels StockLevel[]
+  movements   StockMovement[]
+  purchases   PurchaseInvoice[]
+  orders      Order[]
+  ledger      LedgerEntry[]
+
+  @@index([organizationId])
+}
+
+enum Role {
+  OWNER // Patron: tüm şubeler, tüm raporlar
+  MANAGER // Müdür: kendi şubesi (branchId boşsa tümü)
+  CASHIER // Kasiyer: yalnızca satış ekranı
+}
+
+model User {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?      @relation(fields: [branchId], references: [id])
+  name           String
+  email          String       @unique
+  passwordHash   String
+  role           Role
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+
+  orders Order[]
+
+  @@index([organizationId])
+}
+
+// ---------------------------------------------------------------- Menü & reçete
+
+model Category {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name           String
+  sort           Int          @default(0)
+  products       Product[]
+
+  @@index([organizationId])
+}
+
+model Product {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  categoryId     String
+  category       Category     @relation(fields: [categoryId], references: [id])
+  name           String
+  /// KDV dahil satış fiyatı (TL)
+  price          Decimal      @db.Decimal(12, 2)
+  /// KDV oranı (%) — restoran hizmetinde genelde 10
+  vatRate        Int          @default(10)
+  active         Boolean      @default(true)
+  sort           Int          @default(0)
+  createdAt      DateTime     @default(now())
+
+  recipe     RecipeLine[]
+  orderItems OrderItem[]
+
+  @@index([organizationId])
+}
+
+enum BaseUnit {
+  GR
+  ML
+  ADET
+}
+
+/// Hammadde / stok kalemi (köfte, ekmek, kola şişesi, peynir…)
+model StockItem {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  name               String
+  /// Reçetede ve stokta kullanılan temel birim
+  unit               BaseUnit
+  /// Alışta kullanılan birim adı (örn. "kg", "koli") ve temel birime çevrim katsayısı
+  purchaseUnit       String
+  purchaseUnitFactor Decimal      @db.Decimal(14, 4)
+  /// Son alış maliyeti — temel birim başına, KDV hariç (şube ortalaması yoksa yedek değer)
+  lastCost           Decimal      @default(0) @db.Decimal(14, 6)
+  /// Kritik stok seviyesi (temel birim)
+  minLevel           Decimal      @default(0) @db.Decimal(14, 4)
+  createdAt          DateTime     @default(now())
+
+  recipeLines   RecipeLine[]
+  levels        StockLevel[]
+  movements     StockMovement[]
+  purchaseLines PurchaseLine[]
+
+  @@index([organizationId])
+}
+
+/// Bir ürünün reçetesindeki satır: 1 adet ürün için kullanılan miktar
+model RecipeLine {
+  id          String    @id @default(cuid())
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id])
+  /// Temel birim cinsinden miktar
+  quantity    Decimal   @db.Decimal(14, 4)
+  /// Fire oranı (%) — örn. patateste soyma/kızartma kaybı
+  wastePct    Decimal   @default(0) @db.Decimal(5, 2)
+
+  @@unique([productId, stockItemId])
+}
+
+// ---------------------------------------------------------------- Stok
+
+/// Şube bazında stok miktarı ve ağırlıklı ortalama maliyet
+model StockLevel {
+  id          String    @id @default(cuid())
+  branchId    String
+  branch      Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  stockItemId String
+  stockItem   StockItem @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  quantity    Decimal   @default(0) @db.Decimal(14, 4)
+  /// Temel birim başına ağırlıklı ortalama maliyet, KDV hariç
+  avgCost     Decimal   @default(0) @db.Decimal(14, 6)
+
+  @@unique([branchId, stockItemId])
+}
+
+enum MovementType {
+  PURCHASE
+  SALE
+  ADJUSTMENT
+  WASTE
+}
+
+model StockMovement {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  stockItemId    String
+  stockItem      StockItem    @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  type           MovementType
+  /// Temel birim; giriş pozitif, çıkış negatif
+  quantity       Decimal      @db.Decimal(14, 4)
+  unitCost       Decimal      @db.Decimal(14, 6)
+  refId          String?
+  createdAt      DateTime     @default(now())
+
+  @@index([branchId, createdAt])
+}
+
+// ---------------------------------------------------------------- Cari hesaplar
+
+enum AccountType {
+  SUPPLIER // Tedarikçi
+  CUSTOMER // Müşteri (açık hesap / kurumsal)
+}
+
+model Account {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type           AccountType
+  name           String
+  taxNumber      String?
+  taxOffice      String?
+  phone          String?
+  email          String?
+  address        String?
+  createdAt      DateTime     @default(now())
+
+  entries   LedgerEntry[]
+  purchases PurchaseInvoice[]
+  orders    Order[]
+
+  @@index([organizationId])
+}
+
+enum LedgerSource {
+  OPENING
+  PURCHASE
+  SALE
+  PAYMENT
+}
+
+/// Cari hareket. Bakiye = SUM(borç) − SUM(alacak).
+/// Pozitif bakiye: karşı taraf bize borçlu. Negatif bakiye: biz karşı tarafa borçluyuz.
+model LedgerEntry {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  accountId      String
+  account        Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  branchId       String?
+  branch         Branch?      @relation(fields: [branchId], references: [id])
+  date           DateTime     @default(now())
+  description    String
+  debit          Decimal      @default(0) @db.Decimal(12, 2)
+  credit         Decimal      @default(0) @db.Decimal(12, 2)
+  source         LedgerSource
+  sourceId       String?
+
+  @@index([accountId, date])
+}
+
+// ---------------------------------------------------------------- Alışlar
+
+model PurchaseInvoice {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [branchId], references: [id])
+  supplierId     String
+  supplier       Account      @relation(fields: [supplierId], references: [id])
+  invoiceNo      String
+  date           DateTime
+  totalNet       Decimal      @db.Decimal(12, 2)
+  totalVat       Decimal      @db.Decimal(12, 2)
+  total          Decimal      @db.Decimal(12, 2)
+  /// Gelen e-faturadan oluşturulduysa ETTN
+  eInvoiceUuid   String?
+  createdAt      DateTime     @default(now())
+
+  lines      PurchaseLine[]
+  eDocuments EDocument[]
+
+  @@index([organizationId, date])
+}
+
+model PurchaseLine {
+  id          String          @id @default(cuid())
+  invoiceId   String
+  invoice     PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  stockItemId String
+  stockItem   StockItem       @relation(fields: [stockItemId], references: [id])
+  /// Alış birimi cinsinden miktar (örn. 5 kg)
+  quantity    Decimal         @db.Decimal(14, 4)
+  /// Alış birimi başına KDV hariç fiyat
+  unitPrice   Decimal         @db.Decimal(14, 4)
+  vatRate     Int
+  lineNet     Decimal         @db.Decimal(12, 2)
+}
+
+// ---------------------------------------------------------------- Satış (adisyon)
+
+model DiningTable {
+  id       String  @id @default(cuid())
+  branchId String
+  branch   Branch  @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  name     String
+  area     String  @default("Salon")
+  sort     Int     @default(0)
+  orders   Order[]
+
+  @@index([branchId])
+}
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+  DELIVERY
+}
+
+enum OrderChannel {
+  POS
+  YEMEKSEPETI
+  GETIR
+  TRENDYOL
+}
+
+enum OrderStatus {
+  OPEN
+  PAID
+  CANCELLED
+}
+
+model Order {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId          String
+  branch            Branch       @relation(fields: [branchId], references: [id])
+  tableId           String?
+  table             DiningTable? @relation(fields: [tableId], references: [id])
+  userId            String?
+  user              User?        @relation(fields: [userId], references: [id])
+  customerAccountId String?
+  customerAccount   Account?     @relation(fields: [customerAccountId], references: [id])
+  number            Int
+  type              OrderType    @default(DINE_IN)
+  channel           OrderChannel @default(POS)
+  externalId        String?
+  status            OrderStatus  @default(OPEN)
+  /// KDV dahil toplam (indirim sonrası)
+  total             Decimal      @default(0) @db.Decimal(12, 2)
+  discount          Decimal      @default(0) @db.Decimal(12, 2)
+  /// Kapanışta hesaplanan toplam maliyet (KDV hariç)
+  totalCost         Decimal      @default(0) @db.Decimal(12, 2)
+  openedAt          DateTime     @default(now())
+  closedAt          DateTime?
+
+  items      OrderItem[]
+  payments   Payment[]
+  eDocuments EDocument[]
+
+  @@index([branchId, status])
+  @@index([organizationId, closedAt])
+}
+
+enum ItemStatus {
+  ACTIVE
+  CANCELLED
+}
+
+model OrderItem {
+  id        String     @id @default(cuid())
+  orderId   String
+  order     Order      @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product    @relation(fields: [productId], references: [id])
+  name      String
+  quantity  Int
+  /// KDV dahil birim fiyat
+  unitPrice Decimal    @db.Decimal(12, 2)
+  vatRate   Int
+  /// Satış anındaki reçete maliyeti (KDV hariç, birim başına) — kapanışta sabitlenir
+  unitCost  Decimal    @default(0) @db.Decimal(12, 4)
+  status    ItemStatus @default(ACTIVE)
+  note      String?
+  createdAt DateTime   @default(now())
+}
+
+enum PaymentMethod {
+  CASH
+  CARD
+  ACCOUNT // Cariye (açık hesap)
+}
+
+model Payment {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method    PaymentMethod
+  amount    Decimal       @db.Decimal(12, 2)
+  createdAt DateTime      @default(now())
+}
+
+// ---------------------------------------------------------------- E-belge (e-fatura / e-arşiv)
+
+enum EDocType {
+  E_FATURA
+  E_ARSIV
+}
+
+enum EDocDirection {
+  OUTGOING
+  INCOMING
+}
+
+enum EDocStatus {
+  DRAFT
+  QUEUED
+  SENT
+  ERROR
+}
+
+model EDocument {
+  id                String           @id @default(cuid())
+  organizationId    String
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  type              EDocType
+  direction         EDocDirection
+  status            EDocStatus       @default(DRAFT)
+  provider          String
+  /// Sağlayıcıdaki belge no / ETTN
+  externalId        String?
+  documentNo        String?
+  orderId           String?
+  order             Order?           @relation(fields: [orderId], references: [id])
+  purchaseInvoiceId String?
+  purchaseInvoice   PurchaseInvoice? @relation(fields: [purchaseInvoiceId], references: [id])
+  payload           Json
+  error             String?
+  createdAt         DateTime         @default(now())
+
+  @@index([organizationId, createdAt])
+}
