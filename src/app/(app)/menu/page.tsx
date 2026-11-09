@@ -37,6 +37,7 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
             </div>
             <button className="btn-secondary">Hesapla</button>
           </form>
+          <Link href="/menu/ice-aktar" className="btn-secondary">Excel'den içe aktar</Link>
           <Link href="/menu/yeni" className="btn-primary">+ Yeni ürün</Link>
         </div>
       </div>

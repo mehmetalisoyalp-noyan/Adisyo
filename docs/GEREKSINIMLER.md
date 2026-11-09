@@ -75,6 +75,7 @@ gerekmiyor.
 | Kullanıcı yönetimi (rol, şube, şifre, pasif yapma), şifremi değiştir | ✅ |
 | Örnek veriyi seçmeli temizleme ve geçiş kontrol listesi | ✅ |
 | Çoklu şirket: şirket bazında cari bakiye/ekstre, e-belgede satıcı şirket, gelen faturada alıcı VKN ile şirket eşleştirme | ✅ |
+| Menü & reçete Excel içe aktarma (Malzemeler / Ürünler / Reçeteler şablonu, önizleme, ada göre güncelleme, boş şablon) | ✅ |
 | Tedarikçi kalemi ↔ stok kalemi eşleştirme hafızası, birim çevrimi | ✅ |
 | Stok dışı fatura kalemleri (nakliye, ambalaj) | ✅ |
 
@@ -92,7 +93,7 @@ gerekmiyor.
 ### Faz 3 — Maliyetin derinleşmesi
 - [ ] Yarı mamul reçeteleri (sos, hamur gibi alt reçeteler)
 - [ ] Ürün seçenekleri/ekstralar (ekstra peynir) ve bunların reçete etkisi
-- [ ] Teorik ve gerçek tüketim karşılaştırması (sayım farkı = kayıp/kaçak analizi)
+- [ ] Teorik ve gerçek tüketim karşılaştırması (sayım farkı = kayıp/kaçak analizi) — Mall of İstanbul 'şube verimlilik' tablosundaki ekmek/köfte/patates/tavuk incelemesinin otomatik hâli
 - [ ] Şube bazında farklı satış fiyatı
 - [ ] Genel giderler (kira, personel, enerji) ile net kâr ve başa baş analizi
 - [ ] Fiyat değişikliği simülasyonu ("köfte %10 zamlanırsa kârım ne olur?")

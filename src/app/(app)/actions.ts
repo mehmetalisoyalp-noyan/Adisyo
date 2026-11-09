@@ -9,6 +9,8 @@ import { closeOrder, nextOrderNumber, recalcTotal } from "@/lib/services/orders"
 import { adjustStock, recordPurchase } from "@/lib/services/stock";
 import { issueForOrder } from "@/lib/services/edocument";
 import { importXml, processIncoming, type ProcessInput } from "@/lib/services/incoming";
+import { key as menuKey, parseMenuWorkbook, previewCosts } from "@/lib/menuImport";
+import { applyMenuImport } from "@/lib/services/menuImport";
 
 const decimal = (v: FormDataEntryValue | null) => Number(String(v ?? "0").replace(",", ".")) || 0;
 
@@ -343,4 +345,57 @@ export async function ignoreIncoming(docId: string) {
     data: { status: "IGNORED" },
   });
   revalidatePath("/alis/e-fatura");
+}
+
+// ---------------------------------------------------------------- Menü & reçete Excel içe aktarma
+
+async function readMenuFile(form: FormData) {
+  const file = form.get("file");
+  if (!(file instanceof File) || !file.size) throw new Error("Excel dosyası seçin");
+  if (file.size > 5_000_000) throw new Error("Dosya 5 MB'tan büyük olamaz");
+  return parseMenuWorkbook(await file.arrayBuffer());
+}
+
+export async function previewMenuImport(form: FormData) {
+  const s = await requireSession(["OWNER", "MANAGER"]);
+  try {
+    const parsed = await readMenuFile(form);
+    const [items, products] = await Promise.all([
+      prisma.stockItem.findMany({ where: { organizationId: s.organizationId }, select: { name: true, unit: true } }),
+      prisma.product.findMany({ where: { organizationId: s.organizationId }, select: { name: true } }),
+    ]);
+    const itemUnit = new Map(items.map((i) => [menuKey(i.name), i.unit]));
+    const errors = [...parsed.errors];
+    for (const si of parsed.stockItems) {
+      const u = itemUnit.get(menuKey(si.name));
+      if (u && u !== si.unit) errors.push(`'${si.name}' programda ${u.toLowerCase()} biriminde kayıtlı, dosyada ${si.unit.toLowerCase()}`);
+    }
+    const prodNames = new Set(products.map((p) => menuKey(p.name)));
+    return {
+      errors,
+      warnings: parsed.warnings,
+      newItems: parsed.stockItems.filter((i) => !itemUnit.has(menuKey(i.name))).length,
+      updatedItems: parsed.stockItems.filter((i) => itemUnit.has(menuKey(i.name))).length,
+      newProducts: parsed.products.filter((p) => !prodNames.has(menuKey(p.name))).length,
+      updatedProducts: parsed.products.filter((p) => prodNames.has(menuKey(p.name))).length,
+      recipeLines: parsed.recipe.length,
+      products: previewCosts(parsed).map((p) => ({ ...p, exists: prodNames.has(menuKey(p.name)) })),
+    };
+  } catch (e) {
+    return { errors: [e instanceof Error ? e.message : "Dosya okunamadı"] };
+  }
+}
+
+export async function commitMenuImport(form: FormData) {
+  const s = await requireSession(["OWNER", "MANAGER"]);
+  try {
+    const parsed = await readMenuFile(form);
+    if (parsed.errors.length) return { error: "Dosyada hata var, önizlemedeki hataları düzeltin" };
+    const counts = await prisma.$transaction((tx) => applyMenuImport(tx, s.organizationId, parsed), { timeout: 60000 });
+    revalidatePath("/menu");
+    revalidatePath("/stok");
+    return { ok: counts };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "İçe aktarılamadı" };
+  }
 }
