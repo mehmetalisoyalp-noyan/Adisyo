@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { money } from "@/lib/format";
+import { day, money } from "@/lib/format";
 
 export default async function PurchasesPage() {
   const s = await requireSession(["OWNER", "MANAGER"]);
@@ -23,7 +23,7 @@ export default async function PurchasesPage() {
           <tbody>
             {invoices.map((i) => (
               <tr key={i.id}>
-                <td>{i.date.toLocaleDateString("tr-TR")}</td>
+                <td>{day(i.date)}</td>
                 <td>{i.invoiceNo}{i.eInvoiceUuid && <span className="ml-1 text-xs text-emerald-700">e-fatura</span>}</td>
                 <td><Link className="text-emerald-700 hover:underline" href={`/cari/${i.supplierId}`}>{i.supplier.name}</Link></td>
                 <td>{i.branch.name}</td>

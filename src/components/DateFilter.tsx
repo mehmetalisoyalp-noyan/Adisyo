@@ -1,4 +1,4 @@
-import { dateInput } from "@/lib/format";
+import { dateInput, startOfDay } from "@/lib/format";
 
 /** GET formu: başlangıç/bitiş tarihi ve şube seçimi */
 export function DateFilter({
@@ -12,8 +12,7 @@ export function DateFilter({
   branches?: { id: string; name: string }[];
   branchId?: string | null;
 }) {
-  const end = new Date(to);
-  end.setDate(end.getDate() - 1);
+  const end = new Date(to.getTime() - 864e5);
   return (
     <form className="flex flex-wrap items-end gap-2">
       <div>
@@ -40,13 +39,10 @@ export function DateFilter({
   );
 }
 
-/** ?from=&to= parametrelerinden [from, to) aralığı; varsayılan: bugün */
+/** ?from=&to= parametrelerinden [from, to) aralığı (Türkiye saatiyle); varsayılan: bugün veya son N gün */
 export function parseRange(sp: { from?: string; to?: string }, defaultDays = 1) {
-  const from = sp.from ? new Date(`${sp.from}T00:00:00`) : new Date();
-  from.setHours(0, 0, 0, 0);
-  if (!sp.from && defaultDays > 1) from.setDate(from.getDate() - (defaultDays - 1));
-  const to = sp.to ? new Date(`${sp.to}T00:00:00`) : new Date();
-  to.setHours(0, 0, 0, 0);
-  to.setDate(to.getDate() + 1);
+  const today = dateInput(new Date());
+  const to = new Date(startOfDay(sp.to || today).getTime() + 864e5);
+  const from = sp.from ? startOfDay(sp.from) : new Date(startOfDay(today).getTime() - (defaultDays - 1) * 864e5);
   return { from, to };
 }

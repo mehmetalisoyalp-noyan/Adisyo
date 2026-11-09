@@ -80,11 +80,3 @@ export async function criticalStock(organizationId: string, branchId?: string | 
   });
   return levels.filter((l) => num(l.quantity) < num(l.stockItem.minLevel));
 }
-
-export function dayRange(dateStr?: string, days = 1) {
-  const from = dateStr ? new Date(`${dateStr}T00:00:00`) : new Date();
-  from.setHours(0, 0, 0, 0);
-  const to = new Date(from);
-  to.setDate(to.getDate() + days);
-  return { from, to };
-}

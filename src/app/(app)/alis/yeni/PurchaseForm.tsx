@@ -1,6 +1,7 @@
 "use client";
 import { useState, useTransition } from "react";
 import { createPurchase } from "../../actions";
+import { dateInput } from "@/lib/format";
 
 type Opt = { id: string; name: string };
 type Item = Opt & { purchaseUnit: string; lastPrice: number };
@@ -14,7 +15,7 @@ export function PurchaseForm({ branches, suppliers, items }: { branches: Opt[]; 
     branchId: branches[0]?.id ?? "",
     supplierId: suppliers[0]?.id ?? "",
     invoiceNo: "",
-    date: new Date().toISOString().slice(0, 10),
+    date: dateInput(new Date()),
   });
   const empty: Line = { stockItemId: "", quantity: "", unitPrice: "", vatRate: "1" };
   const [lines, setLines] = useState<Line[]>([empty]);

@@ -74,6 +74,11 @@ const SUPPLIER_OF = (name: string) =>
       : "Toptan Gıda Pazarlama";
 
 async function main() {
+  // --if-empty: yalnızca veritabanı boşsa yükle (yayın ortamında her derlemede çalışır, mevcut veriyi silmez)
+  if (process.argv.includes("--if-empty") && (await prisma.organization.count()) > 0) {
+    console.log("Veritabanında veri var, örnek veri yüklenmedi.");
+    return;
+  }
   // Tüm veriyi temizle (Organization’a bağlı her tablo CASCADE ile boşalır)
   await prisma.$executeRawUnsafe(`TRUNCATE "Organization" CASCADE`);
 
@@ -101,7 +106,7 @@ async function main() {
     branches.push(br);
   }
 
-  const hash = await bcrypt.hash("123456", 10);
+  const hash = await bcrypt.hash(process.env.SEED_PASSWORD || "123456", 10);
   await prisma.user.createMany({
     data: [
       { organizationId: org.id, name: "Patron", email: "patron@ornek.com", passwordHash: hash, role: "OWNER" },
@@ -233,7 +238,7 @@ async function main() {
       for (let o = 0; o < ordersToday; o++) {
         const day = new Date();
         day.setDate(day.getDate() - d);
-        day.setHours(11 + Math.floor(rnd() * 11), Math.floor(rnd() * 60), 0, 0);
+        day.setUTCHours(8 + Math.floor(rnd() * 11), Math.floor(rnd() * 60), 0, 0); // 11:00–21:59 Türkiye saati
         const delivery = br.hasDelivery && rnd() < 0.3;
         const order = await prisma.order.create({
           data: {
@@ -284,7 +289,7 @@ async function main() {
     }
   }
 
-  console.log("Örnek veri yüklendi. Giriş: patron@ornek.com / 123456");
+  console.log("Örnek veri yüklendi. Giriş: patron@ornek.com (şifre: SEED_PASSWORD, varsayılan 123456)");
 }
 
 main()

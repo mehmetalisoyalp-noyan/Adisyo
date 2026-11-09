@@ -5,6 +5,8 @@ Kafe ve restoranlar için adisyon, **reçete bazlı maliyet analizi**, stok, al�
 
 Gereksinimler ve yol haritası: [docs/GEREKSINIMLER.md](docs/GEREKSINIMLER.md)
 
+İnternette yayınlama (Vercel + Neon): [docs/YAYINLAMA.md](docs/YAYINLAMA.md)
+
 ## Kurulum
 
 Gerekenler: Node.js 20+, PostgreSQL 14+.
@@ -12,7 +14,7 @@ Gerekenler: Node.js 20+, PostgreSQL 14+.
 ```bash
 npm install
 cp .env.example .env          # DATABASE_URL ve SESSION_SECRET değerlerini düzenleyin
-npm run db:reset              # tabloları oluşturur ve örnek veriyi yükler
+npm run db:reset              # tabloları kurar (migration) ve örnek veriyi yükler
 npm run dev                   # http://localhost:3000
 ```
 
@@ -34,6 +36,7 @@ kızartması, içecekler) ve reçeteleri, tedarikçi alışları ve son 7 günü
 | `npm test` | Maliyet hesaplama birim testleri |
 | `npm run lint` | TypeScript tip kontrolü |
 | `npm run db:reset` | Veritabanını sıfırla ve örnek veriyi yükle |
+| `npm run db:migrate` | Bekleyen tablo değişikliklerini uygula |
 
 ## Proje yapısı
 

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireSession } from "@/lib/auth";
 import { num, prisma } from "@/lib/db";
-import { dateInput, money } from "@/lib/format";
+import { dateInput, day, money } from "@/lib/format";
 import { addAccountPayment } from "../../actions";
 
 const SOURCE = { OPENING: "Açılış", PURCHASE: "Alış", SALE: "Satış", PAYMENT: "Ödeme/Tahsilat" } as const;
@@ -41,7 +41,7 @@ export default async function AccountPage({ params }: { params: Promise<{ id: st
           <tbody>
             {rows.map((e) => (
               <tr key={e.id}>
-                <td>{e.date.toLocaleDateString("tr-TR")}</td>
+                <td>{day(e.date)}</td>
                 <td>{e.description}</td>
                 <td className="text-slate-500">{SOURCE[e.source]}</td>
                 <td className="text-slate-500">{e.branch?.name ?? "-"}</td>
