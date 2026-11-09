@@ -1,8 +1,8 @@
 // Gerçek kullanıma geçiş: örnek veriyi temizleme, şube ve masa düzeni.
 import { prisma, type Tx } from "../db";
 
-/** Örnek verideki uydurma vergi numarası */
-export const SAMPLE_TAX_NUMBER = "1234567890";
+/** Örnek verideki uydurma vergi numaraları 123456789 ile başlar */
+export const isSampleTaxNumber = (t: string | null | undefined) => !t || t.startsWith("123456789");
 export const SAMPLE_EMAIL_DOMAIN = "@ornek.com";
 
 export interface ResetOptions {

@@ -38,7 +38,7 @@ export async function closeOrder(
 ) {
   const order = await tx.order.findUniqueOrThrow({
     where: { id: orderId },
-    include: { items: { where: { status: "ACTIVE" } } },
+    include: { items: { where: { status: "ACTIVE" } }, branch: true },
   });
   if (order.status !== "OPEN") throw new Error("Adisyon zaten kapalı");
   if (!order.items.length) throw new Error("Adisyonda ürün yok");
@@ -98,6 +98,7 @@ export async function closeOrder(
       data: {
         organizationId: order.organizationId,
         accountId: customerId,
+        companyId: order.branch.companyId,
         branchId: order.branchId,
         description: `Adisyon #${order.number} (açık hesap)`,
         debit: round(accountPay),

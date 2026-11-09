@@ -11,20 +11,78 @@ type Result = { error?: string; ok?: string } | null;
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
 const fail = (e: unknown): Result => ({ error: e instanceof Error ? e.message : "İşlem yapılamadı" });
 
-// ---------------------------------------------------------------- Şirket
+// ---------------------------------------------------------------- Grup & şirketler
+
+export async function saveGroup(_: Result, f: FormData): Promise<Result> {
+  const s = await requireSession(["OWNER"]);
+  const name = str(f, "name");
+  if (!name) return { error: "Grup adı gerekli" };
+  await prisma.organization.update({ where: { id: s.organizationId }, data: { name } });
+  revalidatePath("/ayarlar");
+  return { ok: "Kaydedildi" };
+}
+
+function companyData(f: FormData) {
+  const name = str(f, "name");
+  const taxNumber = str(f, "taxNumber").replace(/\s/g, "");
+  if (!name) throw new Error("Ticari ünvan gerekli");
+  if (taxNumber && !/^\d{10,11}$/.test(taxNumber)) throw new Error("Vergi numarası 10 (VKN) veya 11 (TCKN) haneli olmalı");
+  return { name, taxNumber: taxNumber || null, taxOffice: str(f, "taxOffice") || null, address: str(f, "address") || null };
+}
+
+async function assertUniqueTax(organizationId: string, taxNumber: string | null, exceptId?: string) {
+  if (!taxNumber) return;
+  const other = await prisma.company.findFirst({ where: { organizationId, taxNumber, id: { not: exceptId } } });
+  if (other) throw new Error(`Bu vergi numarası zaten "${other.name}" şirketinde kayıtlı`);
+}
 
 export async function saveCompany(_: Result, f: FormData): Promise<Result> {
   const s = await requireSession(["OWNER"]);
-  const name = str(f, "name");
-  const taxNumber = str(f, "taxNumber").replace(/\s/g, "");
-  if (!name) return { error: "Şirket ünvanı gerekli" };
-  if (taxNumber && !/^\d{10,11}$/.test(taxNumber)) return { error: "Vergi numarası 10 (VKN) veya 11 (TCKN) haneli olmalı" };
-  await prisma.organization.update({
-    where: { id: s.organizationId },
-    data: { name, taxNumber: taxNumber || null, taxOffice: str(f, "taxOffice") || null },
-  });
-  revalidatePath("/ayarlar");
+  try {
+    const id = str(f, "id");
+    const data = companyData(f);
+    await assertUniqueTax(s.organizationId, data.taxNumber, id || undefined);
+    await prisma.company.updateMany({ where: { id, organizationId: s.organizationId }, data });
+  } catch (e) {
+    return fail(e);
+  }
+  revalidatePath("/ayarlar", "layout");
   return { ok: "Şirket bilgileri kaydedildi" };
+}
+
+/** Yeni şirket ve ilk şubesi (tek adımda) */
+export async function createCompanyWithBranch(_: Result, f: FormData): Promise<Result> {
+  const s = await requireSession(["OWNER"]);
+  try {
+    const data = companyData(f);
+    await assertUniqueTax(s.organizationId, data.taxNumber);
+    const branchName = str(f, "branchName") || data.name;
+    const tables = Number(str(f, "tables")) || 0;
+    await prisma.$transaction(async (tx) => {
+      const c = await tx.company.create({ data: { ...data, organizationId: s.organizationId } });
+      const b = await tx.branch.create({
+        data: { organizationId: s.organizationId, companyId: c.id, name: branchName, hasDelivery: f.get("hasDelivery") === "on" },
+      });
+      if (tables > 0) await setAreaTableCount(tx, b.id, "Salon", tables);
+    });
+  } catch (e) {
+    return fail(e);
+  }
+  revalidatePath("/ayarlar", "layout");
+  return { ok: "Şirket ve şubesi eklendi" };
+}
+
+export async function removeCompany(companyId: string): Promise<Result> {
+  const s = await requireSession(["OWNER"]);
+  const [branches, entries] = await Promise.all([
+    prisma.branch.count({ where: { companyId } }),
+    prisma.ledgerEntry.count({ where: { companyId } }),
+  ]);
+  if (branches) return { error: "Önce şirketin şubelerini silin veya başka şirkete taşıyın" };
+  if (entries) return { error: "Bu şirketin cari hareketleri var. Önce örnek veriyi temizleyin." };
+  await prisma.company.deleteMany({ where: { id: companyId, organizationId: s.organizationId } });
+  revalidatePath("/ayarlar", "layout");
+  return { ok: "Şirket silindi" };
 }
 
 // ---------------------------------------------------------------- Şubeler & masalar
@@ -34,14 +92,26 @@ export async function saveBranch(_: Result, f: FormData): Promise<Result> {
   const id = str(f, "id");
   const name = str(f, "name");
   if (!name) return { error: "Şube adı gerekli" };
-  const data = { name, address: str(f, "address") || null, hasDelivery: f.get("hasDelivery") === "on" };
-  if (id) await prisma.branch.updateMany({ where: { id, organizationId: s.organizationId }, data });
-  else {
+  const company = await prisma.company.findFirst({ where: { id: str(f, "companyId"), organizationId: s.organizationId } });
+  if (!company) return { error: "Şirket seçin" };
+  const data = { name, companyId: company.id, address: str(f, "address") || null, hasDelivery: f.get("hasDelivery") === "on" };
+  if (id) {
+    const b = await prisma.branch.findFirstOrThrow({ where: { id, organizationId: s.organizationId } });
+    // Kayıtları olan şube başka şirkete taşınamaz (muhasebe karışır)
+    if (b.companyId !== company.id) {
+      const [o, p] = await Promise.all([
+        prisma.order.count({ where: { branchId: id } }),
+        prisma.purchaseInvoice.count({ where: { branchId: id } }),
+      ]);
+      if (o || p) return { error: "Satış veya alış kaydı olan şube başka şirkete taşınamaz" };
+    }
+    await prisma.branch.update({ where: { id }, data });
+  } else {
     const b = await prisma.branch.create({ data: { ...data, organizationId: s.organizationId } });
     const count = Number(str(f, "tables")) || 0;
     if (count > 0) await prisma.$transaction((tx) => setAreaTableCount(tx, b.id, "Salon", count));
   }
-  revalidatePath("/ayarlar/subeler");
+  revalidatePath("/ayarlar", "layout");
   return { ok: id ? "Şube güncellendi" : "Şube eklendi" };
 }
 
@@ -55,7 +125,7 @@ export async function setTables(branchId: string, _: Result, f: FormData): Promi
   } catch (e) {
     return fail(e);
   }
-  revalidatePath("/ayarlar/subeler");
+  revalidatePath("/ayarlar", "layout");
   return { ok: `${area}: ${count} masa` };
 }
 
@@ -66,7 +136,7 @@ export async function removeBranch(branchId: string): Promise<Result> {
   } catch (e) {
     return fail(e);
   }
-  revalidatePath("/ayarlar/subeler");
+  revalidatePath("/ayarlar", "layout");
   return { ok: "Şube silindi" };
 }
 

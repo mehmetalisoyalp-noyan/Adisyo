@@ -84,17 +84,21 @@ async function main() {
   await prisma.$executeRawUnsafe(`TRUNCATE "Organization" CASCADE`);
 
   const org = await prisma.organization.create({
-    data: { name: "Örnek Kafe Grubu A.Ş.", taxNumber: "1234567890", taxOffice: "Kadıköy", plan: "PRO" },
+    data: { name: "Örnek Kafe Grubu", plan: "PRO" },
   });
+  // Her kafe ayrı bir şirket (kendi VKN'si) ve o şirketin tek şubesi
   const branchDefs = [
-    { name: "Kafe Moda", tables: 20, hasDelivery: false },
-    { name: "Kafe Bağdat", tables: 15, hasDelivery: false },
-    { name: "Kafe Merkez", tables: 40, hasDelivery: true },
+    { name: "Kafe Moda", company: "Moda Kafe Gıda Ltd. Şti.", tax: "1234567890", office: "Kadıköy", tables: 20, hasDelivery: false },
+    { name: "Kafe Bağdat", company: "Bağdat Kafe Turizm Ltd. Şti.", tax: "1234567891", office: "Erenköy", tables: 15, hasDelivery: false },
+    { name: "Kafe Merkez", company: "Merkez Kafe Restoran A.Ş.", tax: "1234567892", office: "Mecidiyeköy", tables: 40, hasDelivery: true },
   ];
   const branches = [];
   for (const b of branchDefs) {
+    const company = await prisma.company.create({
+      data: { organizationId: org.id, name: b.company, taxNumber: b.tax, taxOffice: b.office },
+    });
     const br = await prisma.branch.create({
-      data: { organizationId: org.id, name: b.name, hasDelivery: b.hasDelivery },
+      data: { organizationId: org.id, companyId: company.id, name: b.name, hasDelivery: b.hasDelivery },
     });
     await prisma.diningTable.createMany({
       data: Array.from({ length: b.tables }, (_, i) => ({
@@ -217,10 +221,11 @@ async function main() {
       });
     }
   }
-  // Tedarikçiye kısmi ödeme
+  // Tedarikçiye kısmi ödeme (ilk şirket adına)
   await prisma.ledgerEntry.create({
     data: {
       organizationId: org.id,
+      companyId: branches[0].companyId,
       accountId: suppliers.get("Et Dünyası Gıda Ltd. Şti.")!,
       description: "Havale ile ödeme",
       debit: 50000,

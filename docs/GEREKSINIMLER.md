@@ -17,9 +17,11 @@ yönetim yazılımı.
 
 | Şube         | Tür  | Masa | Paket servis |
 | ------------ | ---- | ---- | ------------ |
-| Kafe 1       | Kafe | 20   | Hayır        |
-| Kafe 2       | Kafe | 15   | Hayır        |
-| Kafe 3       | Kafe | 40   | Evet         |
+| Kafe 1 (Şirket A) | Kafe | 20   | Hayır        |
+| Kafe 2 (Şirket B) | Kafe | 15   | Hayır        |
+| Kafe 3 (Şirket C) | Kafe | 40   | Evet         |
+
+Her kafe **ayrı bir şirkettir** (ayrı ünvan ve vergi numarası), her şirketin bir şubesi vardır.
 
 Yurt dışındaki 2 işletme bu sistemin kapsamı dışında.
 
@@ -33,6 +35,8 @@ gerekmiyor.
 | Uygulama | Web uygulaması (Next.js) | Kasa bilgisayarı, tablet ve telefonda kurulumsuz çalışır |
 | Veritabanı | PostgreSQL | Muhasebe verisi için güvenilir, ilişkisel |
 | Çok kiracılı yapı | Her kayıt `organizationId` taşır | İleride abonelik satışı için baştan hazır |
+| Şirket yapısı | Grup → Şirket (tüzel kişi, VKN) → Şube | Her kafe ayrı şirket; alış, cari bakiye ve e-belge şirket bazında ayrı, patron hepsini tek girişte görür |
+| Ortak tanımlar | Menü, stok kalemi ve cari kartları grup içinde ortak | Aynı tedarikçinin tek kartı, şirket başına ayrı bakiyesi olur |
 | Kullanıcı rolleri | Patron / Müdür / Kasiyer | Müdür kendi şubesini, patron hepsini görür |
 | Maliyet yöntemi | Şube bazında ağırlıklı ortalama | Türkiye'de yaygın ve vergi mevzuatına uygun |
 | Satış maliyeti | Adisyon kapanırken sabitlenir | Sonradan fiyat değişse de geçmiş kâr değişmez |
@@ -70,6 +74,7 @@ gerekmiyor.
 | Ayarlar: şirket bilgileri, şubeler, bölüm bazında masa sayısı | ✅ |
 | Kullanıcı yönetimi (rol, şube, şifre, pasif yapma), şifremi değiştir | ✅ |
 | Örnek veriyi seçmeli temizleme ve geçiş kontrol listesi | ✅ |
+| Çoklu şirket: şirket bazında cari bakiye/ekstre, e-belgede satıcı şirket, gelen faturada alıcı VKN ile şirket eşleştirme | ✅ |
 | Tedarikçi kalemi ↔ stok kalemi eşleştirme hafızası, birim çevrimi | ✅ |
 | Stok dışı fatura kalemleri (nakliye, ambalaj) | ✅ |
 

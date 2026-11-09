@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { SAMPLE_EMAIL_DOMAIN, SAMPLE_TAX_NUMBER } from "@/lib/services/setup";
+import { isSampleTaxNumber, SAMPLE_EMAIL_DOMAIN } from "@/lib/services/setup";
 import { ActionButton, ActionForm } from "@/components/ActionForm";
-import { deactivateSampleUsers, resetSampleData, saveCompany } from "./actions";
+import { deactivateSampleUsers, resetSampleData, saveGroup } from "./actions";
 import { Tabs } from "./Tabs";
 
 export default async function SettingsPage() {
@@ -21,11 +21,12 @@ export default async function SettingsPage() {
       prisma.account.count({ where: { organizationId: org.id } }),
       prisma.user.findUniqueOrThrow({ where: { id: s.userId } }),
     ]);
-  const companyDone = !!org.taxNumber && org.taxNumber !== SAMPLE_TAX_NUMBER;
+  const companies = await prisma.company.findMany({ where: { organizationId: org.id } });
+  const companyDone = companies.length > 0 && companies.every((c) => !isSampleTaxNumber(c.taxNumber));
   const steps = [
-    { done: companyDone, text: "Şirket ünvanı ve gerçek vergi numaranızı girin", href: "#sirket" },
+    { done: companyDone, text: "Şirketlerinizin ünvanlarını ve vergi numaralarını girin (her kafe ayrı şirket)", href: "/ayarlar/subeler" },
     { done: ownOwner > 0, text: "Kendi e-postanızla bir Patron kullanıcısı oluşturun ve onunla giriş yapın", href: "/ayarlar/kullanicilar" },
-    { done: branchCount > 0, text: "Şube adlarını ve masa sayılarını düzenleyin", href: "/ayarlar/subeler" },
+    { done: branchCount > 0, text: "Şube (kafe) adlarını ve masa sayılarını düzenleyin", href: "/ayarlar/subeler" },
     { done: orderCount === 0 && purchaseCount === 0, text: "Örnek satış ve alışları temizleyin", href: "#temizle" },
     { done: sampleUsersActive === 0, text: "Örnek kullanıcıları (…@ornek.com) pasif yapın", href: "#ornek-kullanici" },
   ];
@@ -53,25 +54,17 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      <div id="sirket" className="card">
-        <h2 className="mb-3 font-semibold">Şirket bilgileri</h2>
-        <ActionForm action={saveCompany} submit="Kaydet" className="grid gap-3 sm:grid-cols-3">
-          <div className="sm:col-span-3">
-            <label className="label">Ticari ünvan</label>
+      <div id="grup" className="card">
+        <h2 className="mb-3 font-semibold">Grup adı</h2>
+        <ActionForm action={saveGroup} submit="Kaydet" className="flex flex-wrap items-end gap-3">
+          <div className="min-w-64 flex-1">
+            <label className="label">Şirketlerinizi bir arada gösteren ad (örn. NATO Grubu)</label>
             <input name="name" defaultValue={org.name} required className="input" />
           </div>
-          <div>
-            <label className="label">Vergi no (VKN) / TCKN</label>
-            <input name="taxNumber" inputMode="numeric" defaultValue={org.taxNumber === SAMPLE_TAX_NUMBER ? "" : (org.taxNumber ?? "")} className="input" />
-          </div>
-          <div>
-            <label className="label">Vergi dairesi</label>
-            <input name="taxOffice" defaultValue={org.taxOffice ?? ""} className="input" />
-          </div>
-          <div className="sm:col-span-3 text-xs text-slate-500">
-            Vergi numarası e-fatura kesmede ve yüklenen XML'lerde "bizim kestiğimiz fatura" ayrımında kullanılır.
-          </div>
         </ActionForm>
+        <p className="mt-2 text-xs text-slate-500">
+          Şirketlerin ünvan ve vergi numaraları <a href="/ayarlar/subeler" className="underline">Şirketler &amp; şubeler</a> sekmesindedir.
+        </p>
       </div>
 
       <div id="temizle" className="card space-y-3 border-rose-200">

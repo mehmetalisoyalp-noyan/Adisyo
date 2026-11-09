@@ -59,7 +59,7 @@ export async function issueForOrder(tx: Tx, organizationId: string, orderId: str
     include: {
       items: { where: { status: "ACTIVE" } },
       customerAccount: true,
-      organization: true,
+      branch: { include: { company: true } },
       eDocuments: { where: { status: { in: ["SENT", "QUEUED"] } } },
     },
   });
@@ -88,10 +88,11 @@ export async function issueForOrder(tx: Tx, organizationId: string, orderId: str
   const payload: EDocPayload = {
     type,
     issueDate: new Date().toISOString(),
+    // Satıcı: adisyonun kesildiği şubenin bağlı olduğu şirket
     seller: {
-      name: order.organization.name,
-      taxNumber: order.organization.taxNumber,
-      taxOffice: order.organization.taxOffice,
+      name: order.branch.company.name,
+      taxNumber: order.branch.company.taxNumber,
+      taxOffice: order.branch.company.taxOffice,
     },
     buyer: buyer
       ? { name: buyer.name, taxNumber: buyer.taxNumber, taxOffice: buyer.taxOffice, address: buyer.address }

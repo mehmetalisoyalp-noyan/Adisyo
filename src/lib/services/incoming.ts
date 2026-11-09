@@ -15,7 +15,9 @@ export type ImportResult = {
 };
 
 export async function importXml(organizationId: string, files: { name: string; xml: string }[]) {
-  const org = await prisma.organization.findUniqueOrThrow({ where: { id: organizationId } });
+  // Gruptaki şirketlerin vergi numaraları: alıcı VKN'si hangi şirketinse fatura onun alışıdır
+  const companies = await prisma.company.findMany({ where: { organizationId } });
+  const byTax = new Map(companies.filter((c) => c.taxNumber).map((c) => [c.taxNumber!, c]));
   const results: ImportResult[] = [];
   for (const f of files) {
     let inv: UblInvoice;
@@ -29,10 +31,12 @@ export async function importXml(organizationId: string, files: { name: string; x
       results.push({ file: f.name, status: "error", message: "ETTN veya fatura kalemi bulunamadı" });
       continue;
     }
-    if (org.taxNumber && inv.supplier.taxNumber === org.taxNumber) {
-      results.push({ file: f.name, status: "skipped", message: `${inv.number}: bizim kestiğimiz (giden) fatura` });
+    const seller = inv.supplier.taxNumber ? byTax.get(inv.supplier.taxNumber) : undefined;
+    if (seller) {
+      results.push({ file: f.name, status: "skipped", message: `${inv.number}: ${seller.name} tarafından kesilmiş (giden) fatura` });
       continue;
     }
+    const buyer = inv.customer.taxNumber ? byTax.get(inv.customer.taxNumber) : undefined;
     const exists =
       (await prisma.eDocument.findFirst({
         where: { organizationId, direction: "INCOMING", externalId: inv.uuid },
@@ -54,10 +58,11 @@ export async function importXml(organizationId: string, files: { name: string; x
       },
     });
     const note = inv.typeCode && inv.typeCode !== "SATIS" ? ` (tür: ${inv.typeCode}, kontrol edin)` : "";
+    const to = buyer ? ` → ${buyer.name}` : " → alıcı VKN'si şirketlerinizle eşleşmedi";
     results.push({
       file: f.name,
       status: "added",
-      message: `${inv.number} · ${inv.supplier.name} · ${inv.payable.toFixed(2)} TL${note}`,
+      message: `${inv.number} · ${inv.supplier.name} · ${inv.payable.toFixed(2)} TL${to}${note}`,
     });
   }
   return results;
@@ -84,6 +89,9 @@ export async function prepareMapping(organizationId: string, docId: string) {
     where: { id: docId, organizationId, direction: "INCOMING" },
   });
   const inv = doc.payload as unknown as UblInvoice;
+  const buyerCompany = inv.customer.taxNumber
+    ? await prisma.company.findFirst({ where: { organizationId, taxNumber: inv.customer.taxNumber } })
+    : null;
   const [supplier, stockItems] = await Promise.all([
     inv.supplier.taxNumber
       ? prisma.account.findFirst({ where: { organizationId, taxNumber: inv.supplier.taxNumber } })
@@ -118,7 +126,7 @@ export async function prepareMapping(organizationId: string, docId: string) {
         : 1;
     return { ...l, stockItemId, baseQtyPerUnit, source };
   });
-  return { doc, inv, supplier, stockItems, lines };
+  return { doc, inv, supplier, stockItems, lines, buyerCompany };
 }
 
 export interface ProcessInput {
@@ -132,6 +140,13 @@ export async function processIncoming(tx: Tx, organizationId: string, docId: str
   });
   if (doc.status !== "DRAFT") throw new Error("Bu belge zaten işlenmiş");
   const inv = doc.payload as unknown as UblInvoice;
+  const branch = await tx.branch.findFirstOrThrow({ where: { id: input.branchId, organizationId }, include: { company: true } });
+  const buyer = inv.customer.taxNumber
+    ? await tx.company.findFirst({ where: { organizationId, taxNumber: inv.customer.taxNumber } })
+    : null;
+  if (buyer && buyer.id !== branch.companyId) {
+    throw new Error(`Fatura ${buyer.name} adına kesilmiş; ${branch.company.name} şubesine kaydedilemez`);
+  }
 
   // Tedarikçi carisi: vergi numarasıyla bul, yoksa aç
   let supplier = inv.supplier.taxNumber

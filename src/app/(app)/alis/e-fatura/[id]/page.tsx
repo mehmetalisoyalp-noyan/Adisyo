@@ -11,9 +11,10 @@ export default async function MapPage({ params }: { params: Promise<{ id: string
   const s = await requireSession(["OWNER", "MANAGER"]);
   const data = await prepareMapping(s.organizationId, id).catch(() => null);
   if (!data) notFound();
-  const { doc, inv, supplier, stockItems, lines } = data;
+  const { doc, inv, supplier, stockItems, lines, buyerCompany } = data;
+  // Alıcı VKN'si bir şirketimizle eşleştiyse yalnızca o şirketin şubeleri seçilebilir
   const branches = await prisma.branch.findMany({
-    where: { organizationId: s.organizationId, ...branchScope(s) },
+    where: { organizationId: s.organizationId, ...branchScope(s), ...(buyerCompany ? { companyId: buyerCompany.id } : {}) },
     orderBy: { name: "asc" },
   });
   return (
@@ -36,6 +37,15 @@ export default async function MapPage({ params }: { params: Promise<{ id: string
           <div className="text-lg font-bold">Ödenecek {money(inv.payable)}</div>
         </div>
       </div>
+      <div className={`rounded-lg p-3 text-sm ${buyerCompany ? "bg-emerald-50 text-emerald-800" : "bg-amber-50 text-amber-800"}`}>
+        Alıcı: <b>{inv.customer.name}</b> (VKN {inv.customer.taxNumber ?? "-"}) —{" "}
+        {buyerCompany
+          ? <>şirketiniz <b>{buyerCompany.name}</b> ile eşleşti.</>
+          : <>şirketlerinizden hiçbiriyle eşleşmedi. Ayarlar → Şirketler &amp; şubeler sayfasında vergi numaralarını kontrol edin.</>}
+      </div>
+      {branches.length === 0 && (
+        <div className="rounded-lg bg-rose-50 p-3 text-sm text-rose-700">Bu şirkete ait, erişebildiğiniz bir şube yok.</div>
+      )}
       {inv.typeCode !== "SATIS" && (
         <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
           Fatura türü <b>{inv.typeCode}</b>. İade veya tevkifatlı faturaları kaydetmeden önce kontrol edin.
@@ -47,7 +57,7 @@ export default async function MapPage({ params }: { params: Promise<{ id: string
         <MappingForm
           docId={doc.id}
           branches={branches.map((b) => ({ id: b.id, name: b.name }))}
-          defaultBranchId={s.branchId ?? branches[0]?.id ?? ""}
+          defaultBranchId={branches.find((b) => b.id === s.branchId)?.id ?? branches[0]?.id ?? ""}
           stockItems={stockItems.map((i) => ({
             id: i.id,
             name: i.name,

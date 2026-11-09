@@ -2,7 +2,7 @@ import Link from "next/link";
 
 const TABS = [
   { href: "/ayarlar", label: "Genel & geçiş" },
-  { href: "/ayarlar/subeler", label: "Şubeler & masalar" },
+  { href: "/ayarlar/subeler", label: "Şirketler & şubeler" },
   { href: "/ayarlar/kullanicilar", label: "Kullanıcılar" },
 ];
 

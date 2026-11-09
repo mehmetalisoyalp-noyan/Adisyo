@@ -15,6 +15,8 @@ datasource db {
 
 // ---------------------------------------------------------------- Kiracı & kullanıcılar
 
+/// Grup / abonelik (kiracı). Bir veya daha fazla şirketi (tüzel kişi) kapsar.
+/// taxNumber/taxOffice alanları eskiden kalmadır; vergi bilgileri artık Company'de tutulur.
 model Organization {
   id        String   @id @default(cuid())
   name      String
@@ -23,6 +25,7 @@ model Organization {
   plan      Plan     @default(STANDARD)
   createdAt DateTime @default(now())
 
+  companies     Company[]
   branches      Branch[]
   users         User[]
   categories    Category[]
@@ -42,10 +45,32 @@ enum Plan {
   PRO
 }
 
+/// Şirket (tüzel kişi): kendi ünvanı ve vergi numarası olan işletme.
+/// Alışlar, cari bakiyeler ve e-belgeler şirket bazında ayrılır.
+model Company {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  /// Ticari ünvan (faturalarda görünen)
+  name           String
+  taxNumber      String?
+  taxOffice      String?
+  address        String?
+  createdAt      DateTime     @default(now())
+
+  branches Branch[]
+  ledger   LedgerEntry[]
+
+  @@unique([organizationId, taxNumber])
+  @@index([organizationId])
+}
+
 model Branch {
   id             String       @id @default(cuid())
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  companyId      String
+  company        Company      @relation(fields: [companyId], references: [id])
   name           String
   address        String?
   hasDelivery    Boolean      @default(false)
@@ -251,6 +276,9 @@ model LedgerEntry {
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   accountId      String
   account        Account      @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  /// Cari bakiyeler şirket bazında ayrılır (aynı tedarikçinin her şirketle ayrı bakiyesi olur)
+  companyId      String
+  company        Company      @relation(fields: [companyId], references: [id])
   branchId       String?
   branch         Branch?      @relation(fields: [branchId], references: [id])
   date           DateTime     @default(now())
@@ -261,6 +289,7 @@ model LedgerEntry {
   sourceId       String?
 
   @@index([accountId, date])
+  @@index([companyId, accountId])
 }
 
 // ---------------------------------------------------------------- Alışlar

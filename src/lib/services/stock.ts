@@ -66,6 +66,9 @@ export interface PurchaseInput {
  */
 export async function recordPurchase(tx: Tx, input: PurchaseInput) {
   if (!input.lines.length) throw new Error("Fatura en az bir satır içermeli");
+  const branch = await tx.branch.findFirstOrThrow({
+    where: { id: input.branchId, organizationId: input.organizationId },
+  });
   const items = await tx.stockItem.findMany({
     where: {
       id: { in: input.lines.flatMap((l) => (l.stockItemId ? [l.stockItemId] : [])) },
@@ -143,6 +146,7 @@ export async function recordPurchase(tx: Tx, input: PurchaseInput) {
     data: {
       organizationId: input.organizationId,
       accountId: input.supplierId,
+      companyId: branch.companyId,
       branchId: input.branchId,
       date: input.date,
       description: `Alış faturası ${input.invoiceNo}`,

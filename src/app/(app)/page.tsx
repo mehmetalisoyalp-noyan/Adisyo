@@ -5,6 +5,7 @@ import { summarize } from "@/lib/costing";
 import { branchSummary, criticalStock, profitabilityReport } from "@/lib/services/reports";
 import { dateInput, money, pct, qty, UNIT_LABEL } from "@/lib/format";
 import { Stat } from "@/components/Stat";
+import { visibleCompanies } from "@/lib/scope";
 import { DateFilter, parseRange } from "@/components/DateFilter";
 
 export default async function Dashboard({ searchParams }: { searchParams: Promise<{ from?: string; to?: string }> }) {
@@ -17,9 +18,11 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
   const { rows: products } = await profitabilityReport({ organizationId: s.organizationId, branchId: s.branchId, from, to });
   const total = summarize(products);
   const critical = await criticalStock(s.organizationId, s.branchId);
+  // Cari bakiyeler şirket bazında ayrı: her (cari, şirket) çifti ayrı bakiyedir
+  const companies = await visibleCompanies(s);
   const balances = await prisma.ledgerEntry.groupBy({
-    by: ["accountId"],
-    where: { organizationId: s.organizationId },
+    by: ["accountId", "companyId"],
+    where: { organizationId: s.organizationId, companyId: { in: companies.map((c) => c.id) } },
     _sum: { debit: true, credit: true },
   });
   const receivable = balances.reduce((a, b) => a + Math.max(0, num(b._sum.debit) - num(b._sum.credit)), 0);
@@ -56,7 +59,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
         <table className="table">
           <thead>
             <tr>
-              <th>Şube</th><th className="num">Adisyon</th><th className="num">Ciro</th><th className="num">Maliyet</th>
+              <th>Şube / şirket</th><th className="num">Adisyon</th><th className="num">Ciro</th><th className="num">Maliyet</th>
               <th className="num">Brüt kâr</th><th className="num">Marj</th><th className="num">Nakit</th><th className="num">Kart</th>
               <th className="num">Cariye</th><th className="num">Açık masa</th>
             </tr>
@@ -64,7 +67,7 @@ export default async function Dashboard({ searchParams }: { searchParams: Promis
           <tbody>
             {rows.map((r) => (
               <tr key={r.branch.id}>
-                <td className="font-medium">{r.branch.name}</td>
+                <td className="font-medium">{r.branch.name}<div className="text-xs font-normal text-slate-400">{r.branch.company.name}</div></td>
                 <td className="num">{r.orderCount}</td>
                 <td className="num">{money(r.summary.grossRevenue)}</td>
                 <td className="num">{money(r.summary.cost)}</td>

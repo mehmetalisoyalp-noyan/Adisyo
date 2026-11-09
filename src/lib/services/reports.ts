@@ -39,7 +39,8 @@ export async function profitabilityReport(f: ReportFilter) {
 export async function branchSummary(f: Omit<ReportFilter, "branchId">) {
   const branches = await prisma.branch.findMany({
     where: { organizationId: f.organizationId },
-    orderBy: { name: "asc" },
+    orderBy: { createdAt: "asc" },
+    include: { company: true },
   });
   const result = [];
   for (const b of branches) {

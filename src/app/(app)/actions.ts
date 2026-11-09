@@ -279,9 +279,16 @@ export async function addAccountPayment(accountId: string, form: FormData) {
   const amount = decimal(form.get("amount"));
   if (amount <= 0) return;
   const desc = String(form.get("description") ?? "").trim();
+  // Hangi şirketin ödemesi/tahsilatı? Şubeye bağlı müdür yalnızca kendi şirketi adına işlem yapar.
+  const companyId = s.branchId
+    ? (await prisma.branch.findUniqueOrThrow({ where: { id: s.branchId } })).companyId
+    : (await prisma.company.findFirstOrThrow({
+        where: { id: String(form.get("companyId") ?? ""), organizationId: s.organizationId },
+      })).id;
   await prisma.ledgerEntry.create({
     data: {
       organizationId: s.organizationId,
+      companyId,
       accountId,
       date: form.get("date") ? new Date(String(form.get("date"))) : new Date(),
       description: desc || (acc.type === "SUPPLIER" ? "Ödeme" : "Tahsilat"),

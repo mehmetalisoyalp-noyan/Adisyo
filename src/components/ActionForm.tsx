@@ -1,5 +1,5 @@
 "use client";
-import { useActionState, useState, useTransition } from "react";
+import { startTransition, useActionState, useState, useTransition } from "react";
 
 type Result = { error?: string; ok?: string } | null;
 
@@ -22,10 +22,14 @@ export function ActionForm({
   const [state, run, pending] = useActionState(action, null);
   return (
     <form
-      action={run}
       className={className}
       onSubmit={(e) => {
-        if (confirm && !window.confirm(confirm)) e.preventDefault();
+        // Formu elle gönderiyoruz: React'in gönderim sonrası alanları sıfırlamasını önler,
+        // böylece hata mesajında kullanıcının yazdıkları kaybolmaz.
+        e.preventDefault();
+        if (confirm && !window.confirm(confirm)) return;
+        const data = new FormData(e.currentTarget);
+        startTransition(() => run(data));
       }}
     >
       {children}
