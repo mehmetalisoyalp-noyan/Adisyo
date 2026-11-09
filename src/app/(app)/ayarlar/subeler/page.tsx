@@ -8,7 +8,7 @@ export default async function BranchesPage() {
   const s = await requireSession(["OWNER"]);
   const branches = await prisma.branch.findMany({
     where: { organizationId: s.organizationId },
-    orderBy: { name: "asc" },
+    orderBy: { createdAt: "asc" }, // ekleniş sırası: yeniden adlandırınca yer değiştirmez
     include: { tables: { select: { area: true } }, _count: { select: { orders: true, purchases: true } } },
   });
   return (
