@@ -187,14 +187,15 @@ export async function parseMenuWorkbook(data: ArrayBuffer): Promise<ParsedMenu> 
         const status = c.status ? key(text(row.getCell(c.status).value)) : "satışta";
         const price = c.price ? number(row.getCell(c.price).value) : null;
         const active = status !== "taslak";
-        if (active && price == null) warnings.push(`Ürünler satır ${r} (${name}): satış fiyatı boş, ürün taslak olarak eklenecek`);
+        if (active && price == null)
+          warnings.push(`Ürünler satır ${r} (${name}): satış fiyatı boş. Ürün satışta görünecek ama fiyat girilene kadar adisyona eklenemez.`);
         out.products.push({
           row: r,
           category,
           name,
           price,
           vatRate: Math.round((c.vat ? number(row.getCell(c.vat).value) : null) ?? 10),
-          active: active && price != null,
+          active,
         });
       });
     }

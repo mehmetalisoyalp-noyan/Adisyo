@@ -19,6 +19,7 @@ const standard = (wb: ExcelJS.Workbook) => {
   p.addRow(["Kategori", "Ürün adı", "Satış fiyatı (KDV dahil, ₺)", "KDV %", "Durum"]);
   p.addRow(["Menüler", "Burger Menü", 390, 10, "Satışta"]);
   p.addRow(["Burgerler", "Taslak Burger", null, 10, "Taslak"]);
+  p.addRow(["Burgerler", "Fiyatsız Açık Burger", null, 10, "Satışta"]);
   const r = wb.addWorksheet("Reçeteler");
   r.addRow(["Ürün adı", "Malzeme adı", "Miktar (1 porsiyon)", "Birim", "Fire %"]);
   r.addRow(["Burger Menü", "Yuvarlak Köfte 150 gr", 1, "adet", 0]);
@@ -34,6 +35,9 @@ describe("parseMenuWorkbook", () => {
     expect(p.stockItems).toHaveLength(4);
     expect(p.stockItems.find((s) => s.name === "Kola Şurup")).toMatchObject({ unit: "ML", factor: 10000, price: 3240.4625 });
     expect(p.products.find((x) => x.name === "Taslak Burger")).toMatchObject({ active: false, price: null });
+    // Fiyatı boş ama "Satışta": açık kalır, uyarı verilir
+    expect(p.products.find((x) => x.name === "Fiyatsız Açık Burger")).toMatchObject({ active: true, price: null });
+    expect(p.warnings.join()).toMatch(/Fiyatsız Açık Burger.*fiyat girilene kadar/);
     expect(p.recipe.find((l) => l.item === "baker sos")?.quantity).toBe(20);
   });
 

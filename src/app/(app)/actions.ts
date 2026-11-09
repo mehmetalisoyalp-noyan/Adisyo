@@ -50,6 +50,8 @@ export async function addItem(orderId: string, productId: string) {
   const { s, order } = await ownOrder(orderId);
   if (order.status !== "OPEN") throw new Error("Adisyon kapalı");
   const product = await prisma.product.findFirstOrThrow({ where: { id: productId, organizationId: s.organizationId } });
+  // Fiyatı girilmemiş ürün 0 ₺'ye satılmasın
+  if (Number(product.price) <= 0) throw new Error(`${product.name}: satış fiyatı girilmemiş`);
   await prisma.$transaction(async (tx) => {
     const same = await tx.orderItem.findFirst({ where: { orderId, productId, status: "ACTIVE", note: null } });
     if (same) await tx.orderItem.update({ where: { id: same.id }, data: { quantity: { increment: 1 } } });

@@ -69,6 +69,8 @@ export default async function MenuPage({ searchParams }: { searchParams: Promise
                     <td>
                       <Link className="font-medium text-emerald-700 hover:underline" href={`/menu/${p.id}`}>{p.name}</Link>
                       {p._count.recipe === 0 && <span className="ml-2 rounded bg-amber-100 px-1 text-xs text-amber-800">reçete yok</span>}
+                      {price <= 0 && <span className="ml-2 rounded bg-amber-100 px-1 text-xs text-amber-800">fiyat girilmedi</span>}
+                      {!p.active && <span className="ml-2 rounded bg-slate-200 px-1 text-xs text-slate-600">satışa kapalı</span>}
                     </td>
                     <td className="num">{money(price)}</td>
                     {costs.map((x, i) => <td key={i} className="num">{money(x)}</td>)}

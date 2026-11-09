@@ -60,14 +60,25 @@ export default async function OrderPage({
             ))}
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4">
-            {activeCat?.products.map((p) => (
-              <form key={p.id} action={addItem.bind(null, order.id, p.id)}>
-                <button disabled={!open} className="h-20 w-full rounded-xl border border-slate-200 bg-white p-2 text-sm font-medium shadow-sm hover:border-emerald-400 disabled:opacity-50">
-                  {p.name}
-                  <div className="text-xs text-slate-500 tabular-nums">{money(p.price)}</div>
-                </button>
-              </form>
-            ))}
+            {activeCat?.products.map((p) => {
+              const noPrice = num(p.price) <= 0;
+              return (
+                <form key={p.id} action={addItem.bind(null, order.id, p.id)}>
+                  <button
+                    disabled={!open || noPrice}
+                    title={noPrice ? "Satış fiyatı girilmemiş: Menü & Reçete sayfasından fiyat girin" : undefined}
+                    className="h-20 w-full rounded-xl border border-slate-200 bg-white p-2 text-sm font-medium shadow-sm hover:border-emerald-400 disabled:opacity-50"
+                  >
+                    {p.name}
+                    {noPrice ? (
+                      <div className="text-xs text-amber-700">fiyat girilmedi</div>
+                    ) : (
+                      <div className="text-xs text-slate-500 tabular-nums">{money(p.price)}</div>
+                    )}
+                  </button>
+                </form>
+              );
+            })}
           </div>
         </div>
 
