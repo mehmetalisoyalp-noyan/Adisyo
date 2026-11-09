@@ -40,7 +40,21 @@ export interface PurchaseInput {
   invoiceNo: string;
   date: Date;
   eInvoiceUuid?: string;
-  lines: { stockItemId: string; quantity: number; unitPrice: number; vatRate: number }[];
+  /** E-faturadaki ödenecek tutar: verilirse fatura toplamı ve cari kaydı bu tutarla yapılır
+   *  (kuruş yuvarlama ve tevkifat farklarında cari, tedarikçi ekstresiyle birebir tutar) */
+  payable?: number;
+  lines: {
+    /** Boşsa stoğa girmeyen kalem (nakliye, ambalaj, hizmet…) */
+    stockItemId?: string | null;
+    description?: string | null;
+    /** Alış birimi cinsinden miktar */
+    quantity: number;
+    /** Alış birimi başına KDV hariç fiyat */
+    unitPrice: number;
+    vatRate: number;
+    /** Verilirse satır tutarı olarak bu kullanılır (e-faturadaki kuruş farklarını önler) */
+    lineNet?: number;
+  }[];
 }
 
 /**
@@ -53,21 +67,32 @@ export interface PurchaseInput {
 export async function recordPurchase(tx: Tx, input: PurchaseInput) {
   if (!input.lines.length) throw new Error("Fatura en az bir satır içermeli");
   const items = await tx.stockItem.findMany({
-    where: { id: { in: input.lines.map((l) => l.stockItemId) }, organizationId: input.organizationId },
+    where: {
+      id: { in: input.lines.flatMap((l) => (l.stockItemId ? [l.stockItemId] : [])) },
+      organizationId: input.organizationId,
+    },
   });
   const byId = new Map(items.map((i) => [i.id, i]));
 
   let totalNet = 0;
   let totalVat = 0;
   const lineData = input.lines.map((l) => {
-    if (!byId.has(l.stockItemId)) throw new Error("Geçersiz stok kalemi");
+    if (l.stockItemId && !byId.has(l.stockItemId)) throw new Error("Geçersiz stok kalemi");
+    if (!l.stockItemId && !l.description) throw new Error("Stok dışı kalemin açıklaması olmalı");
     if (l.quantity <= 0 || l.unitPrice < 0) throw new Error("Miktar ve fiyat pozitif olmalı");
-    const lineNet = round(l.quantity * l.unitPrice);
+    const lineNet = round(l.lineNet ?? l.quantity * l.unitPrice);
     totalNet += lineNet;
     totalVat += round((lineNet * l.vatRate) / 100);
-    return { ...l, lineNet };
+    return {
+      stockItemId: l.stockItemId || null,
+      description: l.description ?? null,
+      quantity: l.quantity,
+      unitPrice: l.unitPrice,
+      vatRate: l.vatRate,
+      lineNet,
+    };
   });
-  const total = round(totalNet + totalVat);
+  const total = round(input.payable ?? totalNet + totalVat);
 
   const invoice = await tx.purchaseInvoice.create({
     data: {
@@ -85,10 +110,12 @@ export async function recordPurchase(tx: Tx, input: PurchaseInput) {
   });
 
   for (const l of lineData) {
+    if (!l.stockItemId) continue; // stok dışı kalem: yalnızca fatura toplamına ve cariye yansır
     const item = byId.get(l.stockItemId)!;
     const factor = num(item.purchaseUnitFactor);
     const baseQty = l.quantity * factor;
-    const baseCost = baseUnitCost(l.unitPrice, factor);
+    // Birim maliyet satır tutarından hesaplanır: iskontolar maliyete doğru yansır
+    const baseCost = baseUnitCost(l.lineNet / l.quantity, factor);
     const level = await tx.stockLevel.findUnique({
       where: { branchId_stockItemId: { branchId: input.branchId, stockItemId: item.id } },
     });

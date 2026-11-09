@@ -3,14 +3,14 @@ import { prisma } from "@/lib/db";
 import { dt, money } from "@/lib/format";
 import { IssueButton } from "./IssueButton";
 
-const STATUS = { DRAFT: "Taslak", QUEUED: "Kuyrukta", SENT: "Gönderildi", ERROR: "Hata" } as const;
+const STATUS = { DRAFT: "Taslak", QUEUED: "Kuyrukta", SENT: "Gönderildi", PROCESSED: "İşlendi", IGNORED: "Yok sayıldı", ERROR: "Hata" } as const;
 
 export default async function EDocPage() {
   const s = await requireSession(["OWNER", "MANAGER"]);
   const branchFilter = s.branchId ? { branchId: s.branchId } : {};
   const [docs, pending] = await Promise.all([
     prisma.eDocument.findMany({
-      where: { organizationId: s.organizationId, ...(s.branchId ? { order: { branchId: s.branchId } } : {}) },
+      where: { organizationId: s.organizationId, direction: "OUTGOING", ...(s.branchId ? { order: { branchId: s.branchId } } : {}) },
       include: { order: { include: { branch: true } } },
       orderBy: { createdAt: "desc" },
       take: 100,

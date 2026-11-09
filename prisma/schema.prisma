@@ -7,7 +7,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
+  provider  = "postgresql"
   url       = env("DATABASE_URL")
   /// Tablo kurulumu (migration) için havuzsuz doğrudan bağlantı — Neon'da "pooled" olmayan adres
   directUrl = env("DIRECT_URL")
@@ -16,12 +16,12 @@ datasource db {
 // ---------------------------------------------------------------- Kiracı & kullanıcılar
 
 model Organization {
-  id         String   @id @default(cuid())
-  name       String
-  taxNumber  String?
-  taxOffice  String?
-  plan       Plan     @default(STANDARD)
-  createdAt  DateTime @default(now())
+  id        String   @id @default(cuid())
+  name      String
+  taxNumber String?
+  taxOffice String?
+  plan      Plan     @default(STANDARD)
+  createdAt DateTime @default(now())
 
   branches      Branch[]
   users         User[]
@@ -30,6 +30,7 @@ model Organization {
   stockItems    StockItem[]
   accounts      Account[]
   ledgerEntries LedgerEntry[]
+  itemMappings  SupplierItemMapping[]
   purchases     PurchaseInvoice[]
   orders        Order[]
   movements     StockMovement[]
@@ -146,6 +147,7 @@ model StockItem {
   levels        StockLevel[]
   movements     StockMovement[]
   purchaseLines PurchaseLine[]
+  itemMappings  SupplierItemMapping[]
 
   @@index([organizationId])
 }
@@ -226,9 +228,10 @@ model Account {
   address        String?
   createdAt      DateTime     @default(now())
 
-  entries   LedgerEntry[]
-  purchases PurchaseInvoice[]
-  orders    Order[]
+  entries      LedgerEntry[]
+  purchases    PurchaseInvoice[]
+  orders       Order[]
+  itemMappings SupplierItemMapping[]
 
   @@index([organizationId])
 }
@@ -282,6 +285,7 @@ model PurchaseInvoice {
   lines      PurchaseLine[]
   eDocuments EDocument[]
 
+  @@unique([organizationId, eInvoiceUuid])
   @@index([organizationId, date])
 }
 
@@ -289,8 +293,10 @@ model PurchaseLine {
   id          String          @id @default(cuid())
   invoiceId   String
   invoice     PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  stockItemId String
-  stockItem   StockItem       @relation(fields: [stockItemId], references: [id])
+  /// Boşsa stoğa girmeyen kalem (nakliye, ambalaj, hizmet vb. gider)
+  stockItemId String?
+  stockItem   StockItem?      @relation(fields: [stockItemId], references: [id])
+  description String?
   /// Alış birimi cinsinden miktar (örn. 5 kg)
   quantity    Decimal         @db.Decimal(14, 4)
   /// Alış birimi başına KDV hariç fiyat
@@ -416,9 +422,11 @@ enum EDocDirection {
 }
 
 enum EDocStatus {
-  DRAFT
+  DRAFT // Gelen belge: işlenmeyi bekliyor
   QUEUED
   SENT
+  PROCESSED // Gelen belge: alış faturasına dönüştürüldü
+  IGNORED // Gelen belge: kullanıcı yok saydı
   ERROR
 }
 
@@ -442,4 +450,25 @@ model EDocument {
   createdAt         DateTime         @default(now())
 
   @@index([organizationId, createdAt])
+  @@index([organizationId, externalId])
+}
+
+/// Tedarikçinin faturadaki ürününü bizim stok kalemimizle eşleştirme hafızası.
+/// Bir kez eşleştirilen kalem sonraki faturalarda otomatik tanınır.
+model SupplierItemMapping {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  supplierId     String
+  supplier       Account      @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+  /// Tedarikçinin ürün kodu ya da (kod yoksa) normalize edilmiş ürün adı
+  itemKey        String
+  /// Boşsa: bu kalem stoğa girmez (gider)
+  stockItemId    String?
+  stockItem      StockItem?   @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  /// Faturadaki 1 birim = kaç temel birim (gr/ml/adet)
+  baseQtyPerUnit Decimal      @default(1) @db.Decimal(14, 4)
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, supplierId, itemKey])
 }

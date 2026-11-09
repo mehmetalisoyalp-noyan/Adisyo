@@ -15,7 +15,10 @@ export default async function PurchasesPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="h1">Alış Faturaları</h1>
-        <Link href="/alis/yeni" className="btn-primary">+ Alış faturası gir</Link>
+        <div className="flex gap-2">
+          <Link href="/alis/e-fatura" className="btn-primary">Gelen e-fatura yükle (XML)</Link>
+          <Link href="/alis/yeni" className="btn-secondary">+ Elle fatura gir</Link>
+        </div>
       </div>
       <div className="card overflow-x-auto">
         <table className="table">

@@ -66,12 +66,17 @@ gerekmiyor.
 | Maliyet & kârlılık raporu (tarih ve şube filtreli) | ✅ |
 | Patron paneli (mobil uyumlu) | ✅ |
 | E-arşiv / e-fatura kesme (test sağlayıcısı ile) | ✅ (gerçek entegratör bekliyor) |
+| Gelen e-fatura XML (UBL-TR) / ZIP / klasör yükleme → alış faturası | ✅ |
+| Tedarikçi kalemi ↔ stok kalemi eşleştirme hafızası, birim çevrimi | ✅ |
+| Stok dışı fatura kalemleri (nakliye, ambalaj) | ✅ |
 
 ## 6. Yol haritası
 
 ### Faz 2 — Gerçek bağlantılar
 - [ ] **E-fatura entegratörü** bağlantısı (giden e-fatura/e-arşiv ve mükellef sorgusu)
-- [ ] **Gelen e-faturaları** entegratörden çekip tek tıkla alış faturasına çevirme (kalem eşleştirme)
+- [x] Gelen e-faturaları XML olarak yükleyip alış faturasına çevirme (eşleştirme hafızalı)
+- [ ] Gelen e-faturaları entegratörden (Mikrogrup e-Portal) otomatik çekme — API bilgisi bekleniyor
+- [ ] Nakliye gibi giderleri ürün maliyetine dağıtma (isteğe bağlı)
 - [ ] **Yemeksepeti, Getir, Trendyol Yemek** sipariş entegrasyonları
 - [ ] **ÖKC / POS cihazı** entegrasyonu (marka/model öğrenildikten sonra)
 - [ ] Fiş ve mutfak yazıcısı (ESC/POS) çıktısı
@@ -94,7 +99,7 @@ gerekmiyor.
 ## 7. Sizden beklenen bilgiler
 
 1. POS cihazının marka ve modeli
-2. E-fatura entegratörünün tam adı ve API dokümanı / test hesabı
+2. E-fatura entegratörü: **Mikrogrup e-Portal** — API / web servis dokümanı ve test hesabı (Mikrogrup'tan istenecek)
 3. Yemeksepeti, Getir ve Trendyol entegrasyon başvuruları (API anahtarları)
 4. Fiş ve mutfak yazıcısı modelleri (seçildiğinde)
 5. Gerçek menü, reçeteler ve tedarikçi listesi (Excel olarak alınabilirse içe aktarılır)

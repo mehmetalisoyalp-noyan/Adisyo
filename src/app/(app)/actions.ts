@@ -8,6 +8,7 @@ import { canAccessBranch, requireSession } from "@/lib/auth";
 import { closeOrder, nextOrderNumber, recalcTotal } from "@/lib/services/orders";
 import { adjustStock, recordPurchase } from "@/lib/services/stock";
 import { issueForOrder } from "@/lib/services/edocument";
+import { importXml, processIncoming, type ProcessInput } from "@/lib/services/incoming";
 
 const decimal = (v: FormDataEntryValue | null) => Number(String(v ?? "0").replace(",", ".")) || 0;
 
@@ -302,4 +303,37 @@ export async function issueEDocument(orderId: string) {
   }
   revalidatePath("/e-belge");
   return { ok: true };
+}
+
+// ---------------------------------------------------------------- Gelen e-fatura (XML)
+
+export async function importIncoming(files: { name: string; xml: string }[]) {
+  const s = await requireSession(["OWNER", "MANAGER"]);
+  if (files.length > 50) throw new Error("Tek seferde en fazla 50 dosya");
+  const results = await importXml(s.organizationId, files);
+  revalidatePath("/alis/e-fatura");
+  return results;
+}
+
+export async function processIncomingAction(docId: string, input: ProcessInput) {
+  const s = await requireSession(["OWNER", "MANAGER"]);
+  if (!canAccessBranch(s, input.branchId)) return { error: "Bu şubeye erişiminiz yok" };
+  await prisma.branch.findFirstOrThrow({ where: { id: input.branchId, organizationId: s.organizationId } });
+  try {
+    await prisma.$transaction((tx) => processIncoming(tx, s.organizationId, docId, input), { timeout: 30000 });
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : "Kaydedilemedi" };
+  }
+  revalidatePath("/alis");
+  revalidatePath("/alis/e-fatura");
+  redirect("/alis/e-fatura?islendi=1");
+}
+
+export async function ignoreIncoming(docId: string) {
+  const s = await requireSession(["OWNER", "MANAGER"]);
+  await prisma.eDocument.updateMany({
+    where: { id: docId, organizationId: s.organizationId, direction: "INCOMING", status: "DRAFT" },
+    data: { status: "IGNORED" },
+  });
+  revalidatePath("/alis/e-fatura");
 }
