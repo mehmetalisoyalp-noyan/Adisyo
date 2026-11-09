@@ -67,6 +67,9 @@ gerekmiyor.
 | Patron paneli (mobil uyumlu) | ✅ |
 | E-arşiv / e-fatura kesme (test sağlayıcısı ile) | ✅ (gerçek entegratör bekliyor) |
 | Gelen e-fatura XML (UBL-TR) / ZIP / klasör yükleme → alış faturası | ✅ |
+| Ayarlar: şirket bilgileri, şubeler, bölüm bazında masa sayısı | ✅ |
+| Kullanıcı yönetimi (rol, şube, şifre, pasif yapma), şifremi değiştir | ✅ |
+| Örnek veriyi seçmeli temizleme ve geçiş kontrol listesi | ✅ |
 | Tedarikçi kalemi ↔ stok kalemi eşleştirme hafızası, birim çevrimi | ✅ |
 | Stok dışı fatura kalemleri (nakliye, ambalaj) | ✅ |
 

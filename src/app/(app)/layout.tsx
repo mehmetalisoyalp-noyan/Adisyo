@@ -12,6 +12,7 @@ const NAV = [
   { href: "/alis", label: "Alışlar", roles: ["OWNER", "MANAGER"] },
   { href: "/cari", label: "Cari Hesaplar", roles: ["OWNER", "MANAGER"] },
   { href: "/e-belge", label: "E-Fatura / E-Arşiv", roles: ["OWNER", "MANAGER"] },
+  { href: "/ayarlar", label: "Ayarlar", roles: ["OWNER"] },
 ];
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -29,7 +30,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             ))}
           </nav>
           <form action={logout} className="flex items-center gap-2 text-xs text-slate-500">
-            <span className="hidden sm:inline">{s.name} · {ROLE_LABEL[s.role]}</span>
+            <Link href="/hesabim" className="hidden hover:underline sm:inline">{s.name} · {ROLE_LABEL[s.role]}</Link>
             <button className="btn-secondary px-2 py-1 text-xs">Çıkış</button>
           </form>
         </div>

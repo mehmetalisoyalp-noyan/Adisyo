@@ -13,7 +13,7 @@ export default function LoginPage() {
         </div>
         <div>
           <label className="label" htmlFor="email">E-posta</label>
-          <input id="email" name="email" type="email" required className="input" defaultValue="patron@ornek.com" />
+          <input id="email" name="email" type="email" required className="input" autoComplete="username" />
         </div>
         <div>
           <label className="label" htmlFor="password">Şifre</label>
@@ -21,7 +21,6 @@ export default function LoginPage() {
         </div>
         {state?.error && <p className="text-sm text-rose-600">{state.error}</p>}
         <button className="btn-primary w-full" disabled={pending}>{pending ? "Giriş yapılıyor…" : "Giriş"}</button>
-        <p className="text-xs text-slate-400">Deneme: patron@ornek.com, mudur1@ornek.com, kasa1@ornek.com — şifre 123456</p>
       </form>
     </main>
   );

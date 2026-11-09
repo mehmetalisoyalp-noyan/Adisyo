@@ -47,6 +47,11 @@ export default async function ProductPage({
       <Link href="/menu" className="text-sm text-emerald-700">← Menü</Link>
       <h1 className="h1">{product?.name ?? "Yeni ürün"}</h1>
 
+      {categories.length === 0 && (
+        <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
+          Önce <Link href="/menu" className="underline">Menü sayfasının altından</Link> bir kategori ekleyin (örn. Burgerler, İçecekler).
+        </div>
+      )}
       <form action={saveProduct} className="card grid gap-3 sm:grid-cols-6">
         {product && <input type="hidden" name="id" value={product.id} />}
         <div className="sm:col-span-2">
