@@ -2,10 +2,11 @@
 // Çalıştırma: npm run db:reset
 import { PrismaClient, type BaseUnit } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { normalizeDbUrl } from "../src/lib/dburl";
 import { recordPurchase } from "../src/lib/services/stock";
 import { closeOrder, nextOrderNumber, recalcTotal } from "../src/lib/services/orders";
 
-const prisma = new PrismaClient();
+const prisma = new PrismaClient({ datasourceUrl: normalizeDbUrl(process.env.DATABASE_URL) });
 
 // Basit tekrarlanabilir rastgele sayı üreteci (her çalıştırmada aynı veri)
 let seed = 42;
