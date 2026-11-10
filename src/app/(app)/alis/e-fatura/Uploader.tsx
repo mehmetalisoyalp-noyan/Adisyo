@@ -5,9 +5,9 @@ import JSZip from "jszip";
 import { stripAttachments } from "@/lib/xmlstrip";
 import { importIncoming } from "../../actions";
 
-type Result = { file: string; status: "added" | "duplicate" | "skipped" | "error"; message: string };
-const COLOR = { added: "text-emerald-700", duplicate: "text-slate-500", skipped: "text-amber-700", error: "text-rose-600" };
-const LABEL = { added: "Eklendi", duplicate: "Zaten var", skipped: "Atlandı", error: "Hata" };
+type Result = { file: string; status: "added" | "updated" | "duplicate" | "skipped" | "error"; message: string };
+const COLOR = { added: "text-emerald-700", updated: "text-sky-700", duplicate: "text-slate-500", skipped: "text-amber-700", error: "text-rose-600" };
+const LABEL = { added: "Eklendi", updated: "Yenilendi", duplicate: "Zaten var", skipped: "Atlandı", error: "Hata" };
 
 /** Seçilen dosyalardan (XML ve ZIP içindeki XML'ler) fatura metinlerini çıkarır */
 async function collect(files: File[]) {
@@ -77,7 +77,7 @@ export function Uploader() {
         <h2 className="font-semibold">XML yükle</h2>
         <p className="text-sm text-slate-500">
           e-Portal'dan indirdiğiniz gelen e-fatura XML dosyalarını ya da bunları içeren ZIP dosyasını seçin.
-          Bütün bir klasörü de seçebilirsiniz. Aynı fatura iki kez yüklenmez.
+          Bütün bir klasörü de seçebilirsiniz. Aynı fatura iki kez eklenmez; yeniden yüklenirse ayrıntıları yenilenir.
         </p>
       </div>
       <div className="flex flex-wrap gap-2">
@@ -97,7 +97,7 @@ export function Uploader() {
       {results.length > 0 && (
         <div className="space-y-1">
           <p className="text-sm">
-            {(["added", "duplicate", "skipped", "error"] as const).filter((k) => counts[k]).map((k) => `${LABEL[k]}: ${counts[k]}`).join(" · ")}
+            {(["added", "updated", "duplicate", "skipped", "error"] as const).filter((k) => counts[k]).map((k) => `${LABEL[k]}: ${counts[k]}`).join(" · ")}
           </p>
           <div className="max-h-64 overflow-y-auto rounded border border-slate-100 text-xs">
             {results.map((r, i) => (

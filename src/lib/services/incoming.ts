@@ -10,7 +10,7 @@ import { stripAttachments } from "../xmlstrip";
 
 export type ImportResult = {
   file: string;
-  status: "added" | "duplicate" | "skipped" | "error";
+  status: "added" | "updated" | "duplicate" | "skipped" | "error";
   message: string;
 };
 
@@ -21,8 +21,9 @@ export async function importXml(organizationId: string, files: { name: string; x
   const results: ImportResult[] = [];
   for (const f of files) {
     let inv: UblInvoice;
+    const xml = stripAttachments(f.xml);
     try {
-      inv = parseUbl(stripAttachments(f.xml));
+      inv = parseUbl(xml);
     } catch (e) {
       results.push({ file: f.name, status: "error", message: e instanceof Error ? e.message : "Okunamadı" });
       continue;
@@ -37,12 +38,19 @@ export async function importXml(organizationId: string, files: { name: string; x
       continue;
     }
     const buyer = inv.customer.taxNumber ? byTax.get(inv.customer.taxNumber) : undefined;
-    const exists =
-      (await prisma.eDocument.findFirst({
-        where: { organizationId, direction: "INCOMING", externalId: inv.uuid },
-      })) ?? (await prisma.purchaseInvoice.findFirst({ where: { organizationId, eInvoiceUuid: inv.uuid } }));
-    if (exists) {
-      results.push({ file: f.name, status: "duplicate", message: `${inv.number} daha önce yüklenmiş` });
+    // XML'in kendisi de saklanır: ileride okuyucu geliştikçe fatura yeniden okunabilir
+    const payload = { ...inv, raw: xml } as unknown as object;
+    const doc = await prisma.eDocument.findFirst({
+      where: { organizationId, direction: "INCOMING", externalId: inv.uuid },
+    });
+    if (doc) {
+      // Aynı fatura yeniden yüklendi: bilgileri yenile (durum, eşleştirme ve alış kaydı korunur)
+      await prisma.eDocument.update({ where: { id: doc.id }, data: { payload } });
+      results.push({ file: f.name, status: "updated", message: `${inv.number} zaten yüklüydü, fatura ayrıntıları yenilendi` });
+      continue;
+    }
+    if (await prisma.purchaseInvoice.findFirst({ where: { organizationId, eInvoiceUuid: inv.uuid } })) {
+      results.push({ file: f.name, status: "duplicate", message: `${inv.number} daha önce alışlara kaydedilmiş` });
       continue;
     }
     await prisma.eDocument.create({
@@ -54,7 +62,7 @@ export async function importXml(organizationId: string, files: { name: string; x
         provider: "xml-yukleme",
         externalId: inv.uuid,
         documentNo: inv.number,
-        payload: inv as unknown as object,
+        payload,
       },
     });
     const note = inv.typeCode && inv.typeCode !== "SATIS" ? ` (tür: ${inv.typeCode}, kontrol edin)` : "";

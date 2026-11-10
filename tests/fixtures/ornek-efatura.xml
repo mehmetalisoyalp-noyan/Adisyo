@@ -13,6 +13,8 @@
   <cbc:UUID>8f2c1a3e-1111-4c2b-9a77-0123456789ab</cbc:UUID>
   <cbc:IssueDate>2026-11-05</cbc:IssueDate>
   <cbc:InvoiceTypeCode>SATIS</cbc:InvoiceTypeCode>
+  <cbc:Note>Yalnız Yedibindörtyüzaltmışdokuz TL Yirmibeş Kr.</cbc:Note>
+  <cbc:Note>İrsaliye no: IRS-2026-0042</cbc:Note>
   <cbc:DocumentCurrencyCode>TRY</cbc:DocumentCurrencyCode>
   <cbc:LineCountNumeric>3</cbc:LineCountNumeric>
   <cac:AdditionalDocumentReference>
@@ -78,7 +80,8 @@
     <cac:TaxTotal><cbc:TaxAmount currencyID="TRY">6.00</cbc:TaxAmount>
       <cac:TaxSubtotal><cbc:TaxableAmount currencyID="TRY">600.00</cbc:TaxableAmount><cbc:TaxAmount currencyID="TRY">6.00</cbc:TaxAmount><cbc:Percent>1</cbc:Percent>
         <cac:TaxCategory><cac:TaxScheme><cbc:Name>KDV</cbc:Name><cbc:TaxTypeCode>0015</cbc:TaxTypeCode></cac:TaxScheme></cac:TaxCategory></cac:TaxSubtotal></cac:TaxTotal>
-    <cac:Item><cbc:Name>Hamburger Ekmeği 30'lu Koli</cbc:Name></cac:Item>
+    <cbc:Note>Soğuk zincir</cbc:Note>
+    <cac:Item><cbc:Description>Susamlı brioche, 30 adet</cbc:Description><cbc:Name>Hamburger Ekmeği 30'lu Koli</cbc:Name><cbc:BrandName>Örnek Fırın</cbc:BrandName></cac:Item>
     <cac:Price><cbc:PriceAmount currencyID="TRY">300.00</cbc:PriceAmount></cac:Price>
   </cac:InvoiceLine>
   <cac:InvoiceLine>

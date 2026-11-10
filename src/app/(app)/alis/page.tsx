@@ -27,7 +27,10 @@ export default async function PurchasesPage() {
             {invoices.map((i) => (
               <tr key={i.id}>
                 <td>{day(i.date)}</td>
-                <td>{i.invoiceNo}{i.eInvoiceUuid && <span className="ml-1 text-xs text-emerald-700">e-fatura</span>}</td>
+                <td>
+                  <Link href={`/alis/${i.id}`} className="text-emerald-700 hover:underline">{i.invoiceNo}</Link>
+                  {i.eInvoiceUuid && <span className="ml-1 text-xs text-emerald-700">e-fatura</span>}
+                </td>
                 <td><Link className="text-emerald-700 hover:underline" href={`/cari/${i.supplierId}`}>{i.supplier.name}</Link></td>
                 <td>{i.branch.name}<div className="text-xs text-slate-400">{i.branch.company.name}</div></td>
                 <td className="num">{i._count.lines}</td>

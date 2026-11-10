@@ -7,6 +7,7 @@ type Item = { id: string; name: string; unit: "GR" | "ML" | "ADET"; purchaseUnit
 type Line = {
   lineNo: string; name: string; code: string | null; quantity: number; unitCode: string;
   lineNet: number; vatRate: number; stockItemId: string | null; baseQtyPerUnit: number; source: "memory" | "guess" | "none";
+  description?: string | null; note?: string | null; unitPrice?: number; discount?: number; discountPct?: number;
 };
 const BASE = { GR: "gr", ML: "ml", ADET: "adet" } as const;
 const tl = (v: number) => v.toLocaleString("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 2 });
@@ -66,6 +67,8 @@ export function MappingForm({ docId, branches, defaultBranchId, stockItems, line
                   <td className="min-w-48">
                     {l.name}
                     {l.code && <div className="text-xs text-slate-400">kod: {l.code}</div>}
+                    {(l.description || l.note) && <div className="text-xs text-slate-500">{[l.description, l.note].filter(Boolean).join(" · ")}</div>}
+                    {l.discount ? <div className="text-xs text-slate-500">iskonto {l.discountPct ? `%${l.discountPct} ` : ""}({tl(l.discount)})</div> : null}
                     {r.stockItemId === (l.stockItemId ?? "") && srcLabel && <span className={`rounded px-1 text-xs ${srcClass}`}>{srcLabel}</span>}
                   </td>
                   <td className="num whitespace-nowrap">{l.quantity.toLocaleString("tr-TR")} {unitName}</td>

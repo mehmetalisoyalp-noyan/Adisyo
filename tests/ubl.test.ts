@@ -32,6 +32,12 @@ describe("parseUbl", () => {
     expect(inv.lines[1]).toMatchObject({ quantity: 2, unitCode: "BX", lineNet: 600, code: null });
     expect(inv.lines[2]).toMatchObject({ vatRate: 20, lineNet: 480 });
   });
+  it("iskonto, birim fiyat, açıklama ve notları okur", () => {
+    expect(inv.lines[0]).toMatchObject({ unitPrice: 655, discount: 325, discountPct: 5 });
+    expect(inv.lines[1]).toMatchObject({ description: "Susamlı brioche, 30 adet · Örnek Fırın", note: "Soğuk zincir" });
+    expect(inv.lines[2].discount).toBe(0);
+    expect(inv.notes).toEqual(["Yalnız Yedibindörtyüzaltmışdokuz TL Yirmibeş Kr.", "İrsaliye no: IRS-2026-0042"]);
+  });
   it("e-fatura olmayan dosyayı reddeder", () => {
     expect(() => parseUbl("<root/>")).toThrow();
   });

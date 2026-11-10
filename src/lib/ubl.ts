@@ -24,6 +24,14 @@ export interface UblLine {
   lineNet: number;
   vatRate: number;
   vatAmount: number;
+  /** Faturadaki birim fiyat (iskonto öncesi, KDV hariç) */
+  unitPrice?: number;
+  /** Satır iskontosu (tutar ve oran %) */
+  discount?: number;
+  discountPct?: number;
+  /** Kalem açıklaması, marka/model ve satır notu — faturada ürün adı kısa/kodlu ise içerik buradadır */
+  description?: string | null;
+  note?: string | null;
 }
 
 export interface UblInvoice {
@@ -40,6 +48,8 @@ export interface UblInvoice {
   totalNet: number;
   totalVat: number;
   payable: number;
+  /** Fatura genel notları (cbc:Note) */
+  notes?: string[];
 }
 
 const parser = new XMLParser({
@@ -50,7 +60,7 @@ const parser = new XMLParser({
   trimValues: true,
   // Tek elemanlı listeler de dizi olsun
   isArray: (name) =>
-    ["InvoiceLine", "PartyIdentification", "TaxSubtotal", "AllowanceCharge", "Note", "Contact", "AdditionalDocumentReference"].includes(name),
+    ["InvoiceLine", "PartyIdentification", "TaxSubtotal", "AllowanceCharge", "Note", "Contact", "AdditionalDocumentReference", "AdditionalItemIdentification"].includes(name),
 });
 
 type Node = Record<string, unknown> | undefined;
@@ -120,6 +130,20 @@ export function parseUbl(xml: string): UblInvoice {
     const qtyNode = get(l, "InvoicedQuantity") as Record<string, unknown> | string | undefined;
     const vat = lineVat(l);
     const item = get(l, "Item") as Node;
+    const allowances = ((get(l, "AllowanceCharge") as Node[] | undefined) ?? []).filter(
+      (a) => text(get(a, "ChargeIndicator")) !== "true",
+    );
+    const discount = allowances.reduce((s, a) => s + n(get(a, "Amount")), 0);
+    const factor = allowances.reduce((s, a) => s + n(get(a, "MultiplierFactorNumeric")), 0);
+    const extra = [
+      text(get(item, "Description")),
+      text(get(item, "BrandName")),
+      text(get(item, "ModelName")),
+      text(get(((get(item, "AdditionalItemIdentification") as Node[] | undefined) ?? [])[0], "ID")),
+    ]
+      .filter(Boolean)
+      .filter((v, i, arr) => arr.indexOf(v) === i);
+    const lineNotes = (get(l, "Note") as unknown[] | undefined) ?? [];
     return {
       lineNo: text(get(l, "ID")),
       name: text(get(item, "Name")) || text(get(item, "Description")) || "Kalem",
@@ -132,6 +156,11 @@ export function parseUbl(xml: string): UblInvoice {
       lineNet: n(get(l, "LineExtensionAmount")),
       vatRate: vat.rate,
       vatAmount: vat.amount,
+      unitPrice: n(get(l, "Price", "PriceAmount")),
+      discount,
+      discountPct: factor ? Math.round(factor * 10000) / 100 : discount ? undefined : 0,
+      description: extra.filter((v) => v !== text(get(item, "Name"))).join(" · ") || null,
+      note: lineNotes.map((x) => text(x)).filter(Boolean).join(" · ") || null,
     };
   });
 
@@ -150,6 +179,7 @@ export function parseUbl(xml: string): UblInvoice {
     totalNet,
     totalVat: n(get(inv, "TaxTotal", "TaxAmount")) || lines.reduce((s, l) => s + l.vatAmount, 0),
     payable: n(get(totals, "PayableAmount")),
+    notes: ((get(inv, "Note") as unknown[] | undefined) ?? []).map((x) => text(x)).filter(Boolean),
   };
 }
 
