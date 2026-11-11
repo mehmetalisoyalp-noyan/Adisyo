@@ -3,7 +3,8 @@ import Link from "next/link";
 const TABS = [
   { href: "/kapanis", label: "Aylık kapanış raporu" },
   { href: "/kapanis/sayim", label: "Stok sayımları" },
-  { href: "/kapanis/satis", label: "Satış raporları (Adisyo)" },
+  { href: "/kapanis/satis", label: "Satış raporları (Excel)" },
+  { href: "/kapanis/eslestirme", label: "Ürün eşleştirme (Adisyo)" },
 ];
 
 export function Tabs({ active }: { active: string }) {

@@ -86,6 +86,7 @@ gerekmiyor.
 - [x] Gelen e-faturaları XML olarak yükleyip alış faturasına çevirme (eşleştirme hafızalı)
 - [ ] Gelen e-faturaları entegratörden (Mikrogrup e-Portal) otomatik çekme — API bilgisi bekleniyor
 - [ ] Nakliye gibi giderleri ürün maliyetine dağıtma (isteğe bağlı)
+- [x] **Adisyo API** ile tamamlanmış siparişlerin gece otomatik eşitlenmesi (şube bazında, şifreli anahtarlar, ürün adı eşleştirme)
 - [ ] **Yemeksepeti, Getir, Trendyol Yemek** sipariş entegrasyonları
 - [ ] **ÖKC / POS cihazı** entegrasyonu (marka/model öğrenildikten sonra)
 - [ ] Fiş ve mutfak yazıcısı (ESC/POS) çıktısı

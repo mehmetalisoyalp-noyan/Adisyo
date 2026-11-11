@@ -7,4 +7,5 @@ export async function middleware(req: NextRequest) {
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/((?!login|_next|favicon.ico).*)"] };
+// /api/cron: Vercel zamanlanmış görevi; kendi gizli anahtarıyla korunur (oturum çerezi yok)
+export const config = { matcher: ["/((?!login|_next|favicon.ico|api/cron).*)"] };

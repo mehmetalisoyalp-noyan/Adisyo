@@ -2,6 +2,7 @@
 // Maliyet yöntemi: dönem ağırlıklı ortalaması = (açılış değeri + dönem alışları) / (açılış miktarı + alış miktarı)
 import { num, prisma, type Tx } from "../db";
 import { round } from "../costing";
+import { key } from "../menuImport";
 
 export interface PeriodRow {
   stockItemId: string;
@@ -36,7 +37,7 @@ export async function periodReport(organizationId: string, openingId: string, cl
   const from = opening.countedAt;
   const to = closing.countedAt;
 
-  const [items, purchLines, saleLines, posItems, recipes] = await Promise.all([
+  const [items, purchLines, importLines, posItems, recipes, adisyoOrders, aliases, products] = await Promise.all([
     prisma.stockItem.findMany({ where: { organizationId }, orderBy: { name: "asc" } }),
     // Dönem alışları: açılış sayımından sonra, kapanış sayımına kadar (fatura tarihi)
     prisma.purchaseLine.findMany({
@@ -53,7 +54,16 @@ export async function periodReport(organizationId: string, openingId: string, cl
       where: { status: "ACTIVE", order: { branchId, status: "PAID", closedAt: { gt: from, lte: to } } },
     }),
     prisma.recipeLine.findMany({ where: { product: { organizationId } } }),
+    // Adisyo'dan API ile çekilen siparişler (iptaller hariç)
+    prisma.adisyoOrder.findMany({
+      where: { branchId, cancelled: false, orderDate: { gt: from, lte: to } },
+      include: { lines: { where: { cancelled: false } } },
+    }),
+    prisma.productAlias.findMany({ where: { organizationId } }),
+    prisma.product.findMany({ where: { organizationId }, select: { id: true, name: true, vatRate: true } }),
   ]);
+  // Aynı dönem için Adisyo API verisi varsa Excel ile yüklenen rapor kullanılmaz (çift sayım olmasın)
+  const saleLines = adisyoOrders.length ? [] : importLines;
 
   // Ürün satış adetleri ve ciro
   const soldQty = new Map<string, number>();
@@ -71,6 +81,40 @@ export async function periodReport(organizationId: string, openingId: string, cl
       continue;
     }
     soldQty.set(l.productId, (soldQty.get(l.productId) ?? 0) + q);
+  }
+  // Adisyo siparişleri: ürün adı → menüdeki ürün (eşleştirme hafızası, yoksa birebir ad)
+  const aliasOf = new Map(aliases.map((a) => [a.alias, a.productId]));
+  const productByKey = new Map(products.map((p) => [key(p.name), p]));
+  const vatOf = new Map(products.map((p) => [p.id, p.vatRate]));
+  const hasRecipe = new Set(recipes.map((r) => r.productId));
+  const resolve = (name: string) => aliasOf.get(key(name)) ?? productByKey.get(key(name))?.id ?? null;
+  for (const o of adisyoOrders) {
+    revenueGross += num(o.total);
+    // Sipariş KDV oranı bilinmediği için kalemlerin ağırlıklı oranı; kalem yoksa %10
+    const lineSum = o.lines.reduce((t, l) => t + num(l.amount), 0) || 1;
+    let netShare = 0;
+    for (const l of o.lines) netShare += (num(l.amount) / lineSum) / (1 + (vatOf.get(resolve(l.productName) ?? "") ?? 10) / 100);
+    revenueNet += num(o.total) * (o.lines.length ? netShare : 1 / 1.1);
+    const children = new Map<string, typeof o.lines>();
+    for (const l of o.lines) if (l.parentId) children.set(l.parentId, [...(children.get(l.parentId) ?? []), l]);
+    for (const l of o.lines) {
+      if (l.parentId) continue; // alt kalemler aşağıda, menünün durumuna göre
+      const pid = resolve(l.productName);
+      const subs = (l.externalId && children.get(l.externalId)) || [];
+      const countLine = (name: string, q: number, id: string | null) => {
+        if (id) soldQty.set(id, (soldQty.get(id) ?? 0) + q);
+        else {
+          unmatchedQty += q;
+          unmatched.set(name, (unmatched.get(name) ?? 0) + q);
+        }
+      };
+      if (subs.length && !(pid && hasRecipe.has(pid))) {
+        // Menünün kendi reçetesi yok: içindeki ürünler sayılır
+        for (const c of subs) countLine(c.productName, num(c.quantity), resolve(c.productName));
+      } else {
+        countLine(l.productName, num(l.quantity), pid);
+      }
+    }
   }
   for (const i of posItems) {
     soldQty.set(i.productId, (soldQty.get(i.productId) ?? 0) + i.quantity);
@@ -175,7 +219,12 @@ export async function periodReport(organizationId: string, openingId: string, cl
     missing: missing.map((r) => r.name),
     unmatched: [...unmatched.entries()].map(([name, qty]) => ({ name, qty })),
     noRecipe,
-    salesSources: { imports: saleLines.length, posItems: posItems.length },
+    salesSources: {
+      imports: saleLines.length,
+      posItems: posItems.length,
+      adisyoOrders: adisyoOrders.length,
+      importIgnored: adisyoOrders.length > 0 && importLines.length > 0,
+    },
   };
 }
 

@@ -191,3 +191,22 @@ export async function lockPeriod(openingId: string, closingId: string) {
     return fail(e);
   }
 }
+
+// ---------------------------------------------------------------- Adisyo ürün adı eşleştirme
+
+export async function setProductAlias(name: string, productId: string | null) {
+  const s = await requireSession(["OWNER", "MANAGER"]);
+  const alias = key(name);
+  if (!productId) {
+    await prisma.productAlias.deleteMany({ where: { organizationId: s.organizationId, alias } });
+  } else {
+    await prisma.product.findFirstOrThrow({ where: { id: productId, organizationId: s.organizationId } });
+    await prisma.productAlias.upsert({
+      where: { organizationId_alias: { organizationId: s.organizationId, alias } },
+      create: { organizationId: s.organizationId, alias, productId },
+      update: { productId },
+    });
+  }
+  revalidatePath("/kapanis", "layout");
+  return { ok: true };
+}

@@ -6,6 +6,9 @@ import { z } from "zod";
 import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { deleteBranch, resetData, setAreaTableCount } from "@/lib/services/setup";
+import { decrypt, encrypt, hint } from "@/lib/secret";
+import { fetchCompletedOrders } from "@/lib/adisyo";
+import { syncBranch } from "@/lib/services/adisyoSync";
 
 type Result = { error?: string; ok?: string } | null;
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -258,4 +261,80 @@ export async function changeOwnPassword(_: Result, f: FormData): Promise<Result>
   if (!(await bcrypt.compare(current, u.passwordHash))) return { error: "Mevcut şifre hatalı" };
   await prisma.user.update({ where: { id: u.id }, data: { passwordHash: await bcrypt.hash(next, 10) } });
   return { ok: "Şifreniz değiştirildi" };
+}
+
+// ---------------------------------------------------------------- Adisyo entegrasyonu
+
+export async function saveAdisyoAccount(_: Result, f: FormData): Promise<Result> {
+  const s = await requireSession(["OWNER"]);
+  const apiKey = str(f, "apiKey");
+  const consumer = str(f, "consumer");
+  if (!consumer) return { error: "Tüketici adı (x-api-consumer) gerekli" };
+  const existing = await prisma.adisyoAccount.findUnique({ where: { organizationId: s.organizationId } });
+  if (!apiKey && !existing) return { error: "Entegratör anahtarı (x-api-key) gerekli" };
+  await prisma.adisyoAccount.upsert({
+    where: { organizationId: s.organizationId },
+    create: { organizationId: s.organizationId, apiKeyEnc: encrypt(apiKey), consumer },
+    update: { consumer, ...(apiKey ? { apiKeyEnc: encrypt(apiKey) } : {}) },
+  });
+  revalidatePath("/ayarlar/entegrasyon");
+  return { ok: "Kaydedildi" };
+}
+
+export async function saveAdisyoConnection(branchId: string, _: Result, f: FormData): Promise<Result> {
+  const s = await requireSession(["OWNER"]);
+  await prisma.branch.findFirstOrThrow({ where: { id: branchId, organizationId: s.organizationId } });
+  const secret = str(f, "secret");
+  const start = str(f, "startFrom");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(start)) return { error: "Başlangıç tarihi seçin" };
+  const startFrom = new Date(`${start}T00:00:00+03:00`);
+  const active = f.get("active") === "on";
+  const existing = await prisma.adisyoConnection.findUnique({ where: { branchId } });
+  if (!secret && !existing) return { error: "Şube anahtarı (x-api-secret) gerekli" };
+  await prisma.adisyoConnection.upsert({
+    where: { branchId },
+    create: { branchId, apiSecretEnc: encrypt(secret), secretHint: hint(secret), startFrom, active },
+    update: {
+      active,
+      ...(secret ? { apiSecretEnc: encrypt(secret), secretHint: hint(secret) } : {}),
+      // Başlangıç tarihi değiştiyse baştan çek
+      ...(existing && existing.startFrom.getTime() !== startFrom.getTime() ? { startFrom, cursor: null } : {}),
+    },
+  });
+  revalidatePath("/ayarlar/entegrasyon");
+  return { ok: "Bağlantı kaydedildi" };
+}
+
+export async function removeAdisyoConnection(branchId: string): Promise<Result> {
+  const s = await requireSession(["OWNER"]);
+  await prisma.adisyoConnection.deleteMany({ where: { branchId, branch: { organizationId: s.organizationId } } });
+  revalidatePath("/ayarlar/entegrasyon");
+  return { ok: "Bağlantı kaldırıldı (alınmış siparişler korunur)" };
+}
+
+export async function testAdisyoConnection(branchId: string): Promise<Result> {
+  const s = await requireSession(["OWNER"]);
+  const conn = await prisma.adisyoConnection.findFirst({ where: { branchId, branch: { organizationId: s.organizationId } } });
+  const account = await prisma.adisyoAccount.findUnique({ where: { organizationId: s.organizationId } });
+  if (!conn || !account) return { error: "Önce anahtarları kaydedin" };
+  try {
+    const page = await fetchCompletedOrders(
+      { apiKey: decrypt(account.apiKeyEnc), apiSecret: decrypt(conn.apiSecretEnc), consumer: account.consumer },
+      new Date(Date.now() - 24 * 3600 * 1000),
+      1,
+    );
+    return { ok: `Bağlantı çalışıyor. Son 24 saatte ${page.totalCount ?? page.orders?.length ?? 0} tamamlanmış sipariş var.` };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function syncAdisyoNow(branchId: string): Promise<Result> {
+  const s = await requireSession(["OWNER"]);
+  const conn = await prisma.adisyoConnection.findFirst({ where: { branchId, branch: { organizationId: s.organizationId } } });
+  if (!conn) return { error: "Bağlantı yok" };
+  const r = await syncBranch(conn.id, 50000);
+  revalidatePath("/ayarlar/entegrasyon");
+  revalidatePath("/kapanis", "layout");
+  return r.ok ? { ok: r.message } : { error: r.message };
 }

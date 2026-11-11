@@ -82,3 +82,20 @@ açılır.
 Vercel'de **Deployments** sekmesinde kırmızı (**Error**) bir kayıt görürseniz, üzerine tıklayıp
 **Build Logs** bölümündeki son 20–30 satırı kopyalayın ve paylaşın. En sık neden ortam
 değişkenlerinin (Environment Variables) eksik ya da yanlış girilmesidir.
+
+---
+
+## Adisyo entegrasyonu (gece otomatik eşitleme)
+
+Program her gece 04:00'te (Türkiye saati) her şubenin Adisyo'daki tamamlanmış siparişlerini çeker.
+Bunun için Vercel'de bir kez şu ortam değişkenini ekleyin (**Settings → Environment Variables**):
+
+| Key | Value |
+| --- | --- |
+| `CRON_SECRET` | En az 32 karakterlik rastgele bir metin (gece görevinin şifresi) |
+
+Ekledikten sonra **Deployments → en üstteki kayıt → ⋯ → Redeploy** yapın.
+
+Adisyo anahtarları programdaki **Ayarlar → Entegrasyonlar** sayfasından girilir ve veritabanında şifreli saklanır.
+Şifreleme anahtarı `SESSION_SECRET` değerinden türetilir: bu değeri değiştirirseniz Adisyo anahtarlarını yeniden girmeniz gerekir
+(isterseniz ayrı bir `SECRET_KEY` değişkeni tanımlayabilirsiniz).

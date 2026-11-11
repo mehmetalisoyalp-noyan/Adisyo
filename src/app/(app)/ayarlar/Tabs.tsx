@@ -4,6 +4,7 @@ const TABS = [
   { href: "/ayarlar", label: "Genel & geçiş" },
   { href: "/ayarlar/subeler", label: "Şirketler & şubeler" },
   { href: "/ayarlar/kullanicilar", label: "Kullanıcılar" },
+  { href: "/ayarlar/entegrasyon", label: "Entegrasyonlar (Adisyo)" },
 ];
 
 export function Tabs({ active }: { active: string }) {

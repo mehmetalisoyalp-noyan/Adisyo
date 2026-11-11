@@ -58,9 +58,11 @@ export default async function PeriodPage({ searchParams }: { searchParams: Promi
         <>
           <p className="text-sm text-slate-600">
             <b>{report.branch.name}</b> ({report.branch.company.name}) · {day(report.opening.countedAt)} sayımından {day(report.closing.countedAt)} sayımına kadar.
-            Satış verisi: {report.salesSources.imports} rapor satırı{report.salesSources.posItems ? ` + ${report.salesSources.posItems} kasa satırı` : ""}.
+            Satış verisi: {report.salesSources.adisyoOrders ? `Adisyo'dan ${report.salesSources.adisyoOrders} sipariş (otomatik)` : `${report.salesSources.imports} rapor satırı`}
+            {report.salesSources.posItems ? ` + ${report.salesSources.posItems} kasa satırı` : ""}.
+            {report.salesSources.importIgnored && " (Aynı dönem için yüklenen Excel raporu çift sayılmasın diye kullanılmadı.)"}
           </p>
-          {report.salesSources.imports + report.salesSources.posItems === 0 && (
+          {report.salesSources.imports + report.salesSources.posItems + report.salesSources.adisyoOrders === 0 && (
             <div className="rounded-lg bg-amber-50 p-3 text-sm text-amber-800">
               Bu dönem için satış verisi yok; olması gereken tüketim 0 görünür. <Link href="/kapanis/satis" className="underline">Adisyo satış raporunu yükleyin.</Link>
             </div>
@@ -87,7 +89,7 @@ export default async function PeriodPage({ searchParams }: { searchParams: Promi
           )}
           {(report.unmatched.length > 0 || report.noRecipe.length > 0) && (
             <div className="rounded-lg bg-amber-50 p-3 text-xs text-amber-800">
-              {report.unmatched.length > 0 && <div><b>Menüyle eşleşmeyen satışlar</b> (tüketime katılmadı): {report.unmatched.map((u) => `${u.name} (${qty(u.qty)})`).join(", ")}</div>}
+              {report.unmatched.length > 0 && <div><b>Menüyle eşleşmeyen satışlar</b> (tüketime katılmadı; <Link href="/kapanis/eslestirme" className="underline">ürün eşleştirme</Link>): {report.unmatched.map((u) => `${u.name} (${qty(u.qty)})`).join(", ")}</div>}
               {report.noRecipe.length > 0 && <div><b>{report.noRecipe.length} satılan ürünün reçetesi yok</b>; malzeme tüketimi hesaplanamadı.</div>}
             </div>
           )}
