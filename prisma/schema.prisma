@@ -25,19 +25,22 @@ model Organization {
   plan      Plan     @default(STANDARD)
   createdAt DateTime @default(now())
 
-  companies     Company[]
-  branches      Branch[]
-  users         User[]
-  categories    Category[]
-  products      Product[]
-  stockItems    StockItem[]
-  accounts      Account[]
-  ledgerEntries LedgerEntry[]
-  itemMappings  SupplierItemMapping[]
-  purchases     PurchaseInvoice[]
-  orders        Order[]
-  movements     StockMovement[]
-  eDocuments    EDocument[]
+  companies      Company[]
+  branches       Branch[]
+  users          User[]
+  categories     Category[]
+  products       Product[]
+  stockItems     StockItem[]
+  accounts       Account[]
+  ledgerEntries  LedgerEntry[]
+  itemMappings   SupplierItemMapping[]
+  stockCounts    StockCount[]
+  salesImports   SalesImport[]
+  productAliases ProductAlias[]
+  purchases      PurchaseInvoice[]
+  orders         Order[]
+  movements      StockMovement[]
+  eDocuments     EDocument[]
 }
 
 enum Plan {
@@ -76,13 +79,15 @@ model Branch {
   hasDelivery    Boolean      @default(false)
   createdAt      DateTime     @default(now())
 
-  users       User[]
-  tables      DiningTable[]
-  stockLevels StockLevel[]
-  movements   StockMovement[]
-  purchases   PurchaseInvoice[]
-  orders      Order[]
-  ledger      LedgerEntry[]
+  users        User[]
+  tables       DiningTable[]
+  stockLevels  StockLevel[]
+  movements    StockMovement[]
+  purchases    PurchaseInvoice[]
+  orders       Order[]
+  ledger       LedgerEntry[]
+  counts       StockCount[]
+  salesImports SalesImport[]
 
   @@index([organizationId])
 }
@@ -141,6 +146,8 @@ model Product {
 
   recipe     RecipeLine[]
   orderItems OrderItem[]
+  saleLines  SalesImportLine[]
+  aliases    ProductAlias[]
 
   @@index([organizationId])
 }
@@ -173,6 +180,7 @@ model StockItem {
   movements     StockMovement[]
   purchaseLines PurchaseLine[]
   itemMappings  SupplierItemMapping[]
+  countLines    StockCountLine[]
 
   @@index([organizationId])
 }
@@ -500,4 +508,81 @@ model SupplierItemMapping {
   updatedAt      DateTime     @updatedAt
 
   @@unique([organizationId, supplierId, itemKey])
+}
+
+// ---------------------------------------------------------------- Stok sayımı ve aylık kapanış
+
+/// Şubenin belirli bir andaki fiili stok sayımı (ay sonu / dönem başı)
+model StockCount {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch           @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  /// Sayımın yapıldığı gün (Türkiye saatiyle gün sonu kabul edilir)
+  countedAt      DateTime
+  fileName       String?
+  note           String?
+  createdAt      DateTime         @default(now())
+  lines          StockCountLine[]
+
+  @@unique([branchId, countedAt])
+  @@index([organizationId, countedAt])
+}
+
+model StockCountLine {
+  id          String     @id @default(cuid())
+  countId     String
+  count       StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+  stockItemId String
+  stockItem   StockItem  @relation(fields: [stockItemId], references: [id], onDelete: Cascade)
+  /// Temel birim (gr / ml / adet)
+  quantity    Decimal    @db.Decimal(14, 4)
+  /// Açılış sayımında girilen birim maliyet (temel birim başına, KDV hariç); boşsa son alış maliyeti kullanılır
+  unitCost    Decimal?   @db.Decimal(14, 6)
+
+  @@unique([countId, stockItemId])
+}
+
+/// Dış sistemden (Adisyo) yüklenen ürün bazında satış raporu
+model SalesImport {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch            @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  periodStart    DateTime
+  periodEnd      DateTime
+  source         String            @default("adisyo")
+  fileName       String?
+  createdAt      DateTime          @default(now())
+  lines          SalesImportLine[]
+
+  @@index([branchId, periodStart])
+}
+
+model SalesImportLine {
+  id           String      @id @default(cuid())
+  importId     String
+  import       SalesImport @relation(fields: [importId], references: [id], onDelete: Cascade)
+  /// Rapordaki ürün adı
+  externalName String
+  /// Eşleştiği ürün (eşleşmediyse boş: teorik tüketime katılmaz)
+  productId    String?
+  product      Product?    @relation(fields: [productId], references: [id], onDelete: SetNull)
+  quantity     Decimal     @db.Decimal(12, 3)
+  /// Satış tutarı (KDV dahil)
+  revenue      Decimal     @default(0) @db.Decimal(14, 2)
+}
+
+/// Dış sistemdeki ürün adı ↔ programdaki ürün eşleştirme hafızası
+model ProductAlias {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  alias          String
+  productId      String
+  product        Product      @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, alias])
 }

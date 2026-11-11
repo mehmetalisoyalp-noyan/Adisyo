@@ -93,7 +93,7 @@ gerekmiyor.
 ### Faz 3 — Maliyetin derinleşmesi
 - [ ] Yarı mamul reçeteleri (sos, hamur gibi alt reçeteler)
 - [ ] Ürün seçenekleri/ekstralar (ekstra peynir) ve bunların reçete etkisi
-- [ ] Teorik ve gerçek tüketim karşılaştırması (sayım farkı = kayıp/kaçak analizi) — Mall of İstanbul 'şube verimlilik' tablosundaki ekmek/köfte/patates/tavuk incelemesinin otomatik hâli
+- [x] Aylık kapanış: sayım formu (Excel) yükleme, Adisyo satış raporu yükleme ve ürün eşleştirme, gerçek / olması gereken tüketim, zayi, gıda maliyeti oranı, dönem kilitleme (dönem ağırlıklı ortalama maliyet)
 - [ ] Şube bazında farklı satış fiyatı
 - [ ] Genel giderler (kira, personel, enerji) ile net kâr ve başa baş analizi
 - [ ] Fiyat değişikliği simülasyonu ("köfte %10 zamlanırsa kârım ne olur?")

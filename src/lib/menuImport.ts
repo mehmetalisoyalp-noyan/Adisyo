@@ -53,11 +53,11 @@ function cellValue(v: ExcelJS.CellValue): string | number | null {
   }
   return null;
 }
-const text = (v: ExcelJS.CellValue) => {
+export const text = (v: ExcelJS.CellValue) => {
   const x = cellValue(v);
   return x == null ? "" : String(x).trim();
 };
-const number = (v: ExcelJS.CellValue): number | null => {
+export const number = (v: ExcelJS.CellValue): number | null => {
   const x = cellValue(v);
   if (x == null || x === "") return null;
   const n = typeof x === "number" ? x : parseNumberText(String(x));

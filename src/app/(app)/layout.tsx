@@ -7,6 +7,7 @@ const NAV = [
   { href: "/", label: "Patron Paneli", roles: ["OWNER", "MANAGER"] },
   { href: "/pos", label: "Satış", roles: ["OWNER", "MANAGER", "CASHIER"] },
   { href: "/raporlar", label: "Maliyet & Kârlılık", roles: ["OWNER", "MANAGER"] },
+  { href: "/kapanis", label: "Aylık Kapanış", roles: ["OWNER", "MANAGER"] },
   { href: "/menu", label: "Menü & Reçete", roles: ["OWNER", "MANAGER"] },
   { href: "/stok", label: "Stok", roles: ["OWNER", "MANAGER"] },
   { href: "/alis", label: "Alışlar", roles: ["OWNER", "MANAGER"] },
