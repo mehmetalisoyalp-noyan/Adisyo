@@ -27,6 +27,10 @@ export async function parseSalesWorkbook(data: ArrayBuffer): Promise<ParsedSales
       const qtyCol = hs.findIndex((h) => h && QTY(h));
       if (nameCol < 1 || qtyCol < 1) continue;
       const revCol = hs.findIndex((h, i) => h && i !== qtyCol && REV(h));
+      // Adisyo raporunda çok fiyatlı ürünler önce kategorili bir toplam satırıyla, ardından
+      // kategorisi boş fiyat kırılımı satırlarıyla gelir. Kırılımlar toplamı ikinci kez saymasın.
+      const catCol = hs.findIndex((h) => h && /^kategori/.test(h));
+      let groupKey = "";
       out.sheet = ws.name;
       out.headers = hs.filter(Boolean);
       const agg = new Map<string, { name: string; quantity: number; revenue: number }>();
@@ -38,6 +42,11 @@ export async function parseSalesWorkbook(data: ArrayBuffer): Promise<ParsedSales
         if (q == null || q === 0) continue;
         const rev = revCol > 0 ? (number(row.getCell(revCol).value) ?? 0) : 0;
         const k = key(name);
+        if (catCol > 0) {
+          const cat = text(row.getCell(catCol).value);
+          if (cat) groupKey = k;
+          else if (k === groupKey) continue;
+        }
         const a = agg.get(k) ?? { name, quantity: 0, revenue: 0 };
         a.quantity += q;
         a.revenue += rev;
