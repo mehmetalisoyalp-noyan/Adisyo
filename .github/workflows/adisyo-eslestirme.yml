@@ -33,5 +33,13 @@ jobs:
           # -L: aynı sitedeki yönlendirmeleri izle (başlık yalnızca aynı adrese gönderilir)
           code=$(curl -sS -L -o cevap.json -w "%{http_code}" --max-time 90 \
             -H "Authorization: Bearer $CRON_SECRET" "$SITE_URL/api/cron/adisyo")
-          echo "HTTP $code"; cat cevap.json; echo
-          test "$code" = "200"
+          echo "HTTP $code"
+          if grep -q '"ok":true' cevap.json; then echo "Eşitleme çalıştı."; exit 0; fi
+          if grep -qi "vercel" cevap.json && grep -qiE "log in|sso|authentication" cevap.json; then
+            echo "::error::SITE_URL Vercel'in korumalı (giriş isteyen) bir adresi. Vercel > proje > Overview > Domains'teki asıl adresi girin."
+          elif [ "$code" = "401" ]; then
+            echo "::error::Yetkisiz: GitHub'daki CRON_SECRET, Vercel'deki CRON_SECRET ile aynı değil (ya da Vercel'de Redeploy yapılmadı)."
+          else
+            echo "::error::Beklenmeyen cevap (HTTP $code):"; head -c 300 cevap.json; echo
+          fi
+          exit 1
