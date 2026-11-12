@@ -36,6 +36,7 @@ model Organization {
   itemMappings   SupplierItemMapping[]
   stockCounts    StockCount[]
   salesImports   SalesImport[]
+  dailyRevenues  DailyRevenue[]
   productAliases ProductAlias[]
   adisyoAccount  AdisyoAccount?
   adisyoOrders   AdisyoOrder[]
@@ -90,6 +91,7 @@ model Branch {
   ledger           LedgerEntry[]
   counts           StockCount[]
   salesImports     SalesImport[]
+  dailyRevenues    DailyRevenue[]
   adisyoConnection AdisyoConnection?
   adisyoOrders     AdisyoOrder[]
 
@@ -668,4 +670,23 @@ model AdisyoOrderLine {
   features    Json?
 
   @@index([orderId])
+}
+
+/// Günlük ciro ve ödeme türü dağılımı (Adisyo "Günlük Ciro Verileri" raporundan)
+model DailyRevenue {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  branchId       String
+  branch         Branch       @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  /// Gün (Türkiye saatiyle öğlen)
+  date           DateTime
+  total          Decimal      @db.Decimal(14, 2)
+  /// Ödeme türü adı → tutar
+  payments       Json
+  fileName       String?
+  createdAt      DateTime     @default(now())
+
+  @@unique([branchId, date])
+  @@index([organizationId, date])
 }

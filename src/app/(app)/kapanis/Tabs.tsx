@@ -4,6 +4,7 @@ const TABS = [
   { href: "/kapanis", label: "Aylık kapanış raporu" },
   { href: "/kapanis/sayim", label: "Stok sayımları" },
   { href: "/kapanis/satis", label: "Satış raporları (Excel)" },
+  { href: "/kapanis/ciro", label: "Günlük ciro & ödemeler" },
   { href: "/kapanis/eslestirme", label: "Ürün eşleştirme (Adisyo)" },
 ];
 

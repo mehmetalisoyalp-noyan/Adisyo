@@ -5,6 +5,7 @@ import { num, prisma } from "@/lib/db";
 import { canAccessBranch, requireSession } from "@/lib/auth";
 import { parseCountWorkbook } from "@/lib/countImport";
 import { parseSalesWorkbook } from "@/lib/salesImport";
+import { parseDailyRevenueWorkbook, summarizeDays } from "@/lib/dailyRevenueImport";
 import { key } from "@/lib/menuImport";
 import { lockPeriodCosts, periodReport, saveCount } from "@/lib/services/period";
 
@@ -209,4 +210,48 @@ export async function setProductAlias(name: string, productId: string | null) {
   }
   revalidatePath("/kapanis", "layout");
   return { ok: true };
+}
+
+// ---------------------------------------------------------------- Günlük ciro (ödeme türleri)
+
+export async function uploadDailyRevenue(form: FormData) {
+  const s = await requireSession(["OWNER", "MANAGER"]);
+  try {
+    const branchId = String(form.get("branchId") ?? "");
+    if (!branchId) return { error: "Şube seçin" };
+    if (!canAccessBranch(s, branchId)) return { error: "Bu şubeye erişiminiz yok" };
+    await prisma.branch.findFirstOrThrow({ where: { id: branchId, organizationId: s.organizationId } });
+    const { data, name } = await readFile(form);
+    const p = await parseDailyRevenueWorkbook(data);
+    if (p.errors.length) return { error: p.errors.join("; ") };
+    await prisma.$transaction(
+      p.days.map((d) =>
+        prisma.dailyRevenue.upsert({
+          where: { branchId_date: { branchId, date: noon(d.date) } },
+          create: { organizationId: s.organizationId, branchId, date: noon(d.date), total: d.total, payments: d.payments, fileName: name },
+          update: { total: d.total, payments: d.payments, fileName: name },
+        }),
+      ),
+    );
+    revalidatePath("/kapanis", "layout");
+    const sum = summarizeDays(p.days);
+    return {
+      ok: `${p.days.length} gün kaydedildi (${p.days[0].date.split("-").reverse().join(".")} – ${p.days.at(-1)!.date.split("-").reverse().join(".")}). ` +
+        `Toplam ${sum.total.toLocaleString("tr-TR", { style: "currency", currency: "TRY" })}.`,
+    };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteDailyRevenueMonth(branchId: string, month: string) {
+  const s = await requireSession(["OWNER", "MANAGER"]);
+  if (!canAccessBranch(s, branchId) || !/^\d{4}-\d{2}$/.test(month)) return { error: "Kayıt bulunamadı" };
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  await prisma.dailyRevenue.deleteMany({
+    where: { organizationId: s.organizationId, branchId, date: { gte: noon(`${month}-01`), lte: noon(`${month}-${String(last).padStart(2, "0")}`) } },
+  });
+  revalidatePath("/kapanis", "layout");
+  return { ok: "Ay silindi" };
 }

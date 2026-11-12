@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { branchScope, requireSession } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { num, prisma } from "@/lib/db";
+import { MEAL_CARD_COMMISSION, summarizeDays } from "@/lib/dailyRevenueImport";
 import { day, money, pct, qty, UNIT_LABEL } from "@/lib/format";
 import { periodReport } from "@/lib/services/period";
 import { Stat } from "@/components/Stat";
@@ -29,6 +30,13 @@ export default async function PeriodPage({ searchParams }: { searchParams: Promi
     }
   }
   const t = report?.totals;
+  const ciro = report
+    ? summarizeDays(
+        (await prisma.dailyRevenue.findMany({
+          where: { branchId: report.branch.id, date: { gt: report.opening.countedAt, lte: report.closing.countedAt } },
+        })).map((d) => ({ total: num(d.total), payments: d.payments as Record<string, number> })),
+      )
+    : null;
   const unit = (u: keyof typeof UNIT_LABEL) => UNIT_LABEL[u];
 
   return (
@@ -80,6 +88,13 @@ export default async function PeriodPage({ searchParams }: { searchParams: Promi
               hint={t.theoPct != null ? `reçeteye göre olması gereken ${pct(t.theoPct)}` : undefined} tone={t.actualPct != null && t.theoPct != null && t.actualPct > t.theoPct + 2 ? "bad" : undefined} />
           </div>
 
+          {ciro && ciro.total > 0 && (
+            <p className="text-sm text-slate-600">
+              Günlük ciro raporuna göre dönem cirosu <b>{money(ciro.total)}</b>; yemek kartıyla ödenen {money(ciro.mealCard)},
+              komisyonu (%{MEAL_CARD_COMMISSION * 100}) <b className="text-rose-700">{money(ciro.commission)}</b>.{" "}
+              <Link href={`/kapanis/ciro`} className="text-emerald-700 underline">Ayrıntı</Link>
+            </p>
+          )}
           {report.missing.length > 0 && (
             <div className="rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
               <b>{report.missing.length} malzeme açılış veya kapanış sayımında yok</b>; gerçek tüketimleri bilinmediği için toplamlara katılmadı

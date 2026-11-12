@@ -94,6 +94,7 @@ gerekmiyor.
 ### Faz 3 — Maliyetin derinleşmesi
 - [ ] Yarı mamul reçeteleri (sos, hamur gibi alt reçeteler)
 - [ ] Ürün seçenekleri/ekstralar (ekstra peynir) ve bunların reçete etkisi
+- [x] Günlük ciro raporu (ödeme türleri) yükleme, yemek kartı komisyonu (%6)
 - [x] Aylık kapanış: sayım formu (Excel) yükleme, Adisyo satış raporu yükleme ve ürün eşleştirme, gerçek / olması gereken tüketim, zayi, gıda maliyeti oranı, dönem kilitleme (dönem ağırlıklı ortalama maliyet)
 - [ ] Şube bazında farklı satış fiyatı
 - [ ] Genel giderler (kira, personel, enerji) ile net kâr ve başa baş analizi
