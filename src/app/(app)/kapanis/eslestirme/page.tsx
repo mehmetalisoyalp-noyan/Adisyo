@@ -9,7 +9,11 @@ export default async function MappingPage() {
   const since = new Date(Date.now() - 180 * 24 * 3600 * 1000);
   const [lines, products, aliases] = await Promise.all([
     prisma.adisyoOrderLine.findMany({
-      where: { cancelled: false, order: { organizationId: s.organizationId, cancelled: false, orderDate: { gte: since } } },
+      // Şubeye bağlı müdür yalnızca kendi şubesinin Adisyo ürünlerini görür (eşleştirme yine tüm grupta geçerlidir)
+      where: {
+        cancelled: false,
+        order: { organizationId: s.organizationId, cancelled: false, orderDate: { gte: since }, ...(s.branchId ? { branchId: s.branchId } : {}) },
+      },
       select: { productName: true, quantity: true, amount: true, parentId: true },
     }),
     prisma.product.findMany({ where: { organizationId: s.organizationId }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
@@ -35,6 +39,7 @@ export default async function MappingPage() {
       <div className="card text-sm text-slate-600">
         Adisyo'daki ürün adlarının menüdeki karşılıkları (son 180 gün). Eşleştirme geçmiş siparişlere de uygulanır.
         Reçetesi olmayan içecek gibi ürünleri eşleştirmeden bırakabilirsiniz; bunlar ciroya katılır ama malzeme tüketimine katılmaz.
+        {s.branchId ? " Yalnızca kendi şubenizin ürünleri listelenir; yaptığınız eşleştirme menü ortak olduğu için tüm şubelerde geçerlidir." : ""}
         {unmatched > 0 && <b className="ml-1 text-amber-700">{unmatched} ürün eşleşmedi.</b>}
       </div>
       <div className="card overflow-x-auto">
