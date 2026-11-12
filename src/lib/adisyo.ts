@@ -153,7 +153,11 @@ export async function fetchCompletedOrders(c: AdisyoCredentials, startDate: Date
     signal: AbortSignal.timeout(30000),
   });
   if (res.status === 401 || res.status === 403) throw new AdisyoError("Adisyo anahtarları reddedildi (yetkisiz). Anahtarları kontrol edin.", res.status);
-  if (!res.ok) throw new AdisyoError(`Adisyo yanıt vermedi (HTTP ${res.status})`, res.status);
+  if (!res.ok) {
+    // Adisyo'nun hata açıklamasını da göster (teşhis için)
+    const detail = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 200);
+    throw new AdisyoError(`Adisyo isteği kabul etmedi (HTTP ${res.status})${detail ? `: ${detail}` : ""}`, res.status);
+  }
   const body = (await res.json()) as RawPage;
   if (body.status === false) throw new AdisyoError(`Adisyo hata döndürdü: ${body.message ?? "bilinmiyor"}`);
   return body;

@@ -51,6 +51,14 @@ export async function syncBranch(connectionId: string, timeBudgetMs = 45000): Pr
     if (!account) throw new AdisyoError("Önce Adisyo entegratör anahtarını (x-api-key) girin");
     const creds = { apiKey: decrypt(account.apiKeyEnc), apiSecret: decrypt(conn.apiSecretEnc), consumer: account.consumer };
     const start = conn.cursor ? new Date(Math.max(conn.cursor.getTime() - OVERLAP_MS, conn.startFrom.getTime())) : conn.startFrom;
+    if (start.getTime() > Date.now()) {
+      // Başlangıç tarihi henüz gelmedi: Adisyo'ya gelecek tarihli istek gönderilmez
+      result.ok = true;
+      result.done = true;
+      result.message = `Başlangıç tarihi (${start.toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" })}) henüz gelmedi; eşitleme o tarihte kendiliğinden başlayacak`;
+      await prisma.adisyoConnection.update({ where: { id: conn.id }, data: { lastSyncAt: new Date(), lastStatus: result.message, lastError: null } });
+      return result;
+    }
     let page = 1;
     let pageCount = 1;
     let maxDate: Date | null = null;
