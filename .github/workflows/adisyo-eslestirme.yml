@@ -25,7 +25,13 @@ jobs:
             echo "SITE_URL veya CRON_SECRET tanımlı değil; atlanıyor."
             exit 0
           fi
-          code=$(curl -sS -o cevap.json -w "%{http_code}" --max-time 90 \
+          # Adres düzeltmeleri: boşluk, sondaki "/" ve http → https
+          SITE_URL="$(echo "$SITE_URL" | tr -d '[:space:]')"
+          SITE_URL="${SITE_URL%%/}"; SITE_URL="${SITE_URL%%/}"
+          SITE_URL="${SITE_URL/#http:\/\//https://}"
+          case "$SITE_URL" in https://*) ;; *) SITE_URL="https://$SITE_URL" ;; esac
+          # -L: aynı sitedeki yönlendirmeleri izle (başlık yalnızca aynı adrese gönderilir)
+          code=$(curl -sS -L -o cevap.json -w "%{http_code}" --max-time 90 \
             -H "Authorization: Bearer $CRON_SECRET" "$SITE_URL/api/cron/adisyo")
           echo "HTTP $code"; cat cevap.json; echo
           test "$code" = "200"
