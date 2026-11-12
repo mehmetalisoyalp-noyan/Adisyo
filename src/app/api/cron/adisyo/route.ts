@@ -12,5 +12,6 @@ export async function GET(req: Request) {
   }
   // 60 sn içinde her şubeden (paralel) 41 sn arayla en fazla 2 sayfa; kalanı sonraki çalışmada sürer
   const results = await syncAll(undefined, 55_000);
-  return Response.json({ ok: true, results });
+  // Dış zamanlayıcıya (ör. cron-job.org) ayrıntı verilmez: şube adı, sipariş sayısı vb. yalnızca programda görünür
+  return Response.json({ ok: results.every((r) => r.ok) });
 }
