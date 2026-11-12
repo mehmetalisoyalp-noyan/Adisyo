@@ -7,8 +7,8 @@ import { prisma } from "@/lib/db";
 import { requireSession } from "@/lib/auth";
 import { deleteBranch, resetData, setAreaTableCount } from "@/lib/services/setup";
 import { decrypt, encrypt, hint } from "@/lib/secret";
-import { fetchCompletedOrders } from "@/lib/adisyo";
-import { syncBranch } from "@/lib/services/adisyoSync";
+import { ADISYO_MIN_GAP_MS, AdisyoError, fetchCompletedOrders } from "@/lib/adisyo";
+import { syncStep } from "@/lib/services/adisyoSync";
 
 type Result = { error?: string; ok?: string } | null;
 const str = (f: FormData, k: string) => String(f.get(k) ?? "").trim();
@@ -317,6 +317,10 @@ export async function testAdisyoConnection(branchId: string): Promise<Result> {
   const conn = await prisma.adisyoConnection.findFirst({ where: { branchId, branch: { organizationId: s.organizationId } } });
   const account = await prisma.adisyoAccount.findUnique({ where: { organizationId: s.organizationId } });
   if (!conn || !account) return { error: "Önce anahtarları kaydedin" };
+  // Adisyo sınırı: 40 saniyede 1 istek (test de bu sayaca dahil)
+  const since = conn.lastRequestAt ? Date.now() - conn.lastRequestAt.getTime() : Infinity;
+  if (since < ADISYO_MIN_GAP_MS) return { error: `Adisyo sınırı: ${Math.ceil((ADISYO_MIN_GAP_MS - since) / 1000)} sn sonra tekrar deneyin` };
+  await prisma.adisyoConnection.update({ where: { id: conn.id }, data: { lastRequestAt: new Date() } });
   try {
     const page = await fetchCompletedOrders(
       { apiKey: decrypt(account.apiKeyEnc), apiSecret: decrypt(conn.apiSecretEnc), consumer: account.consumer },
@@ -325,16 +329,20 @@ export async function testAdisyoConnection(branchId: string): Promise<Result> {
     );
     return { ok: `Bağlantı çalışıyor. Son 24 saatte ${page.totalCount ?? page.orders?.length ?? 0} tamamlanmış sipariş var.` };
   } catch (e) {
+    if (e instanceof AdisyoError && e.rateLimited) return { error: "Adisyo sınırı aşıldı; 40 sn sonra tekrar deneyin" };
     return fail(e);
   }
 }
 
-export async function syncAdisyoNow(branchId: string): Promise<Result> {
+/** Tek eşitleme adımı (en fazla bir Adisyo isteği). Ekrandaki düğme adımları 41 sn arayla kendisi tekrarlar. */
+export async function syncAdisyoStep(branchId: string) {
   const s = await requireSession(["OWNER"]);
   const conn = await prisma.adisyoConnection.findFirst({ where: { branchId, branch: { organizationId: s.organizationId } } });
-  if (!conn) return { error: "Bağlantı yok" };
-  const r = await syncBranch(conn.id, 50000);
-  revalidatePath("/ayarlar/entegrasyon");
-  revalidatePath("/kapanis", "layout");
-  return r.ok ? { ok: r.message } : { error: r.message };
+  if (!conn) return { ok: false, done: true, waitMs: 0, orders: 0, message: "Bağlantı yok" };
+  const r = await syncStep(conn.id);
+  if (r.done) {
+    revalidatePath("/ayarlar/entegrasyon");
+    revalidatePath("/kapanis", "layout");
+  }
+  return r;
 }

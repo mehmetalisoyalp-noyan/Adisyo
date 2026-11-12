@@ -2,7 +2,8 @@ import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { dateInput, dt } from "@/lib/format";
 import { ActionButton, ActionForm } from "@/components/ActionForm";
-import { removeAdisyoConnection, saveAdisyoAccount, saveAdisyoConnection, syncAdisyoNow, testAdisyoConnection } from "../actions";
+import { removeAdisyoConnection, saveAdisyoAccount, saveAdisyoConnection, testAdisyoConnection } from "../actions";
+import { SyncButton } from "./SyncButton";
 import { Tabs } from "../Tabs";
 
 export default async function IntegrationPage() {
@@ -24,6 +25,8 @@ export default async function IntegrationPage() {
         <p>
           Bağlantı kurulduğunda program her gece (04:00) her şubenin Adisyo'daki tamamlanmış siparişlerini kendisi çeker; aylık kapanışta satış raporu yüklemeniz gerekmez.
           Anahtarlar şifreli saklanır ve bir daha ekranda gösterilmez (yalnızca son 4 karakteri).
+          Adisyo her 40 saniyede yalnızca bir istek (en çok 100 sipariş) kabul ettiği için ilk eşitleme sipariş sayısına göre birkaç dakika sürebilir;
+          sayfa açık kaldığı sürece kendiliğinden devam eder, kapatırsanız sonra kaldığı yerden sürer.
         </p>
         <p>
           <b>x-api-key</b>: Adisyo'nun entegrasyon için verdiği anahtar · <b>x-api-secret</b>: her şubenin Adisyo uygulamasında
@@ -72,7 +75,7 @@ export default async function IntegrationPage() {
             {c && (
               <div className="flex flex-wrap gap-3">
                 <ActionButton action={testAdisyoConnection.bind(null, b.id)} label="Bağlantıyı test et" className="btn-secondary" />
-                <ActionButton action={syncAdisyoNow.bind(null, b.id)} label="Şimdi eşitle" className="btn-secondary" />
+                <SyncButton branchId={b.id} />
                 <ActionButton action={removeAdisyoConnection.bind(null, b.id)} label="Bağlantıyı kaldır" confirm="Bağlantı kaldırılsın mı?" className="text-sm text-rose-600 underline" />
               </div>
             )}

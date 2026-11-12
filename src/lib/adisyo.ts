@@ -123,10 +123,17 @@ export function mapOrder(o: RawOrder): MappedOrder | null {
 }
 
 export class AdisyoError extends Error {
-  constructor(message: string, readonly status?: number) {
+  constructor(message: string, readonly status?: number, readonly apiCode?: number) {
     super(message);
   }
+  /** Adisyo hız sınırı aşıldı (sonuç kodu 601) */
+  get rateLimited() {
+    return this.apiCode === 601;
+  }
 }
+
+/** Adisyo istek sınırı: CompletedOrders için 40 saniyede 1 çağrı (güvenlik payıyla 41 sn) */
+export const ADISYO_MIN_GAP_MS = 41_000;
 
 /**
  * HTTP başlıkları yalnızca 0–255 aralığında karakter taşıyabilir. Adisyo tüketici adının Türkçe karakterlerle
@@ -155,10 +162,19 @@ export async function fetchCompletedOrders(c: AdisyoCredentials, startDate: Date
   if (res.status === 401 || res.status === 403) throw new AdisyoError("Adisyo anahtarları reddedildi (yetkisiz). Anahtarları kontrol edin.", res.status);
   if (!res.ok) {
     // Adisyo'nun hata açıklamasını da göster (teşhis için)
-    const detail = (await res.text().catch(() => "")).replace(/\s+/g, " ").slice(0, 200);
-    throw new AdisyoError(`Adisyo isteği kabul etmedi (HTTP ${res.status})${detail ? `: ${detail}` : ""}`, res.status);
+    const text = await res.text().catch(() => "");
+    let apiCode: number | undefined;
+    try {
+      apiCode = Number(JSON.parse(text).status) || undefined;
+    } catch {
+      /* JSON değil */
+    }
+    const detail = text.replace(/\s+/g, " ").slice(0, 200);
+    throw new AdisyoError(`Adisyo isteği kabul etmedi (HTTP ${res.status})${detail ? `: ${detail}` : ""}`, res.status, apiCode);
   }
   const body = (await res.json()) as RawPage;
-  if (body.status === false) throw new AdisyoError(`Adisyo hata döndürdü: ${body.message ?? "bilinmiyor"}`);
+  if (body.status === false || body.status === 601) {
+    throw new AdisyoError(`Adisyo hata döndürdü: ${body.message ?? "bilinmiyor"}`, res.status, typeof body.status === "number" ? body.status : undefined);
+  }
   return body;
 }

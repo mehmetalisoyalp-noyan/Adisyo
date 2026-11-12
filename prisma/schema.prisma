@@ -605,20 +605,26 @@ model AdisyoAccount {
 
 /// Şubenin Adisyo restoran bağlantısı (x-api-secret şifreli)
 model AdisyoConnection {
-  id           String    @id @default(cuid())
-  branchId     String    @unique
-  branch       Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
-  apiSecretEnc String
-  secretHint   String
-  active       Boolean   @default(true)
+  id            String    @id @default(cuid())
+  branchId      String    @unique
+  branch        Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  apiSecretEnc  String
+  secretHint    String
+  active        Boolean   @default(true)
   /// İlk eşitlemede bu tarihten itibaren siparişler çekilir
-  startFrom    DateTime
+  startFrom     DateTime
   /// Bir sonraki eşitlemenin başlayacağı an (en son alınan siparişin zamanı)
-  cursor       DateTime?
-  lastSyncAt   DateTime?
-  lastStatus   String?
-  lastError    String?
-  updatedAt    DateTime  @updatedAt
+  cursor        DateTime?
+  lastSyncAt    DateTime?
+  lastStatus    String?
+  lastError     String?
+  /// Adisyo hız sınırı (CompletedOrders: 40 saniyede 1 istek) için son istek zamanı
+  lastRequestAt DateTime?
+  /// Yarım kalan eşitleme: sabit başlangıç, sıradaki sayfa ve o ana kadarki en yeni sipariş zamanı
+  runStart      DateTime?
+  nextPage      Int?
+  runMaxDate    DateTime?
+  updatedAt     DateTime  @updatedAt
 }
 
 /// Adisyo'dan alınan tamamlanmış sipariş
